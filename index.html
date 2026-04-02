@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PHÚC TEA – Dashboard Chuỗi Cung Ứng Q1/2026</title>
+<title>PHÚC TEA – Dashboard Kinh Doanh</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
@@ -180,7 +180,7 @@ tr:last-child td{border-bottom:none}
     <div><h1>PHÚC TEA – DASHBOARD CHUỖI CUNG ỨNG</h1><p>Quản lý &amp; phân tích hiệu quả kinh doanh chuỗi cửa hàng</p></div>
   </div>
   <div style="display:flex;align-items:center;gap:10px">
-    <div class="badge">Q1 / 2026</div>
+    <div class="badge" id="dataBadge">–</div>
     <div style="font-size:11px;opacity:.7">Dữ liệu đến: 03/12/2026</div>
   </div>
 </div>
@@ -270,7 +270,7 @@ tr:last-child td{border-bottom:none}
 
 <!-- SO SÁNH THÁNG -->
 <div class="page" id="page-cmp">
-  <p class="stitle">So sánh theo Tháng – Q1/2026</p>
+  <p class="stitle">So sánh theo Tháng</p>
   <div class="cgrid" id="cmpCards"></div>
   <div class="cc" style="margin-bottom:16px">
     <div class="ch"><div class="ctitle">Biểu đồ so sánh Tháng 1 / Tháng 2 / Tháng 3</div></div>
@@ -455,7 +455,7 @@ tr:last-child td{border-bottom:none}
     <div class="bod-period-tabs">
       <button class="bod-period-tab active" onclick="renderBODGroup('month',this)">Tháng hiện tại</button>
       <button class="bod-period-tab" onclick="renderBODGroup('quarter',this)">Quý hiện tại</button>
-      <button class="bod-period-tab" onclick="renderBODGroup('year',this)">Cả năm 2026</button>
+      <button class="bod-period-tab" onclick="renderBODGroup('year',this)">Cả năm</button>
     </div>
     <div class="tbl-wrap" style="padding:0">
       <table class="bod-group-table">
@@ -603,7 +603,7 @@ tr:last-child td{border-bottom:none}
 
 <!-- KPI MỤC TIÊU -->
 <div class="page" id="page-kpi">
-  <p class="stitle">🎯 KPI Mục tiêu – Kế hoạch vs Thực tế 2026</p>
+  <p class="stitle">🎯 KPI Mục tiêu – Kế hoạch vs Thực tế</p>
 
   <div class="achieve-grid" id="achieveGrid">
     <div class="achieve-card" style="border-color:#3182ce"><h4 style="color:#3182ce">Tháng hiện tại (T3)</h4><div class="achieve-row"><span class="achieve-label">Chưa nhập kế hoạch</span></div></div>
@@ -962,6 +962,14 @@ async function fetchSalesFromSheet(){
 // Tự động tải lại mỗi 5 phút
 setInterval(fetchSalesFromSheet, 5*60*1000);
 
+function updateBadge(){
+  const years=[...new Set(D_CY.map(r=>r.nam))].filter(Boolean).sort();
+  const el=document.getElementById('dataBadge');
+  if(!el) return;
+  if(!years.length){el.textContent='–';return;}
+  el.textContent=years.length===1?String(years[0]):years[0]+' – '+years[years.length-1];
+}
+
 function applyF(){
   const f=getF();
   filt=D_CY.filter(r=>{
@@ -973,6 +981,7 @@ function applyF(){
     return true;
   });
   renderAll();
+  updateBadge();
 }
 function resetF(){
   fBrand.value='';fGran.value='month';fFrom.value='';fTo.value='';fStore.value='';fCat.value='';
@@ -1547,7 +1556,7 @@ function renderYoY(){
   const tdt26=dt26arr.reduce((s,v)=>s+v,0), tdt25=dt25arr.reduce((s,v)=>s+v,0);
   const tln26=ln26arr.reduce((s,v)=>s+v,0), tln25=ln25arr.reduce((s,v)=>s+v,0);
   const tsl26=sl26arr.reduce((s,v)=>s+v,0), tsl25=sl25arr.reduce((s,v)=>s+v,0);
-  const period_lbl=selM>0?('Tháng '+selM):(cmpMonths.length<=3?'Q1':'Cả năm');
+  const period_lbl=selM>0?('Tháng '+selM):(cmpMonths.length<=3?'Q'+Math.ceil(cmpMonths[0]/3):'Cả năm');
   tb+=`<tr style="background:#f0f7f3;font-weight:700">
     <td>${period_lbl} (Tổng)</td>
     <td>${fmtB(tdt25)}</td><td>${fmtB(tdt26)}</td><td>${growthLbl(tdt26,tdt25)}</td>
@@ -2158,9 +2167,9 @@ function recalcKPI(){
   const qLabel=`Q${Math.ceil(lastM/3)} (T${qMs[0]}–T${qMs[qMs.length-1]})`;
   const ag=document.getElementById('achieveGrid');
   if(ag) ag.innerHTML=
-    `<div class="achieve-card" style="border-color:#3182ce;color:#3182ce">${buildAchieve([lastM],'Tháng '+lastM+'/2026')}</div>`+
+    `<div class="achieve-card" style="border-color:#3182ce;color:#3182ce">${buildAchieve([lastM],'Tháng '+lastM+'/'+lastYear)}</div>`+
     `<div class="achieve-card" style="border-color:#1a6b3c;color:#1a6b3c">${buildAchieve(qMs,qLabel)}</div>`+
-    `<div class="achieve-card" style="border-color:#f0a500;color:#f0a500">${buildAchieve(allMs,'Cả năm 2026')}</div>`;
+    `<div class="achieve-card" style="border-color:#f0a500;color:#f0a500">${buildAchieve(allMs,'Cả năm '+lastYear)}</div>`;
 }
 
 // ===== KHỞI TẠO RENDER =====
