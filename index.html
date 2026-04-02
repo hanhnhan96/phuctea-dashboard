@@ -416,7 +416,13 @@ tr:last-child td{border-bottom:none}
       <p class="stitle" style="margin:0">📋 Báo cáo BOD – Chuỗi PHÚC TEA</p>
       <div class="bod-date" id="bodDateInfo">Đang tải dữ liệu...</div>
     </div>
-    <div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="fg" style="gap:6px">
+        <label style="font-size:11px;font-weight:700;color:#555;white-space:nowrap">📅 Báo cáo đến:</label>
+        <input type="date" id="bodReportDate" onchange="renderBOD()"
+               style="border:1px solid #d0d7de;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">
+        <button style="background:#6b7a8d;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer" onclick="document.getElementById('bodReportDate').value='';renderBOD()">Mới nhất</button>
+      </div>
       <button class="bod-print-btn" onclick="window.print()">🖨️ In báo cáo</button>
       <button class="bod-copy-btn" onclick="copyBOD()">📋 Copy gửi Zalo</button>
     </div>
@@ -970,6 +976,8 @@ async function fetchSalesFromSheet(){
 
 // Tự động tải lại mỗi 5 phút
 setInterval(fetchSalesFromSheet, 5*60*1000);
+
+let _kpiCache = {};
 
 function updateBadge(){
   const years=[...new Set(D_CY.map(r=>r.nam))].filter(Boolean).sort();
@@ -1716,12 +1724,22 @@ function renderYoY(){
 
 // ===== TAB BÁO CÁO BOD =====
 function renderBOD(){
-  const data2026=D_ALL.filter(r=>r.nam===2026);
-  if(!data2026.length){document.getElementById('bodDateInfo').textContent='Không có dữ liệu 2026';return;}
+  const allData2026=D_ALL.filter(r=>r.nam===2026);
+  if(!allData2026.length){document.getElementById('bodDateInfo').textContent='Không có dữ liệu 2026';return;}
 
-  // Ngày có dữ liệu gần nhất
-  const dates=data2026.map(r=>r.ngay).filter(x=>x).map(x=>new Date(x)).filter(x=>!isNaN(x));
-  const lastDate=new Date(Math.max(...dates));
+  // Xác định ngày báo cáo: dùng date picker nếu có, không thì lấy ngày mới nhất
+  const selDateEl=document.getElementById('bodReportDate');
+  const sortedDates=allData2026.map(r=>r.ngay).filter(x=>x&&x.length>=10).map(x=>x.slice(0,10)).sort();
+  const autoDate=sortedDates[sortedDates.length-1]||new Date().toISOString().slice(0,10);
+  const reportDateStr=(selDateEl&&selDateEl.value)?selDateEl.value:autoDate;
+  // Set date picker nếu chưa set
+  if(selDateEl&&!selDateEl.value) selDateEl.value=autoDate;
+
+  // Lọc dữ liệu đến ngày báo cáo
+  const data2026=allData2026.filter(r=>r.ngay&&r.ngay.slice(0,10)<=reportDateStr);
+  if(!data2026.length){document.getElementById('bodDateInfo').textContent='Không có dữ liệu trước ngày '+reportDateStr;return;}
+
+  const lastDate=new Date(reportDateStr);
   const lastDay=lastDate.getDate(), lastMonth=lastDate.getMonth()+1, lastYear=lastDate.getFullYear();
   const daysInMonth=new Date(lastYear,lastMonth,0).getDate();
   const paceRatio=lastDay/daysInMonth; // % ngày đã qua trong tháng
@@ -1743,7 +1761,10 @@ function renderBOD(){
 
   // Lấy targets từ localStorage (KPI tab)
   function getKH(field,month){
-    const el=document.getElementById(field+'_'+month);
+    const key=field+'_'+month;
+    // _kpiCache chứa các giá trị tính toán (dt_kh, ln_kh) từ recalcKPI
+    if(_kpiCache[key]!==undefined) return _kpiCache[key];
+    const el=document.getElementById(key);
     return el&&el.value?pN(el.value):null;
   }
   const dt_kh_m=getKH('dt_kh',lastMonth);
@@ -2173,6 +2194,7 @@ function recalcKPI(){
 
     // DT BH mục tiêu = HT KH × Tỷ lệ KH / 100
     var dt_kh = (ht_kh!==null&&tl_kh!==null) ? ht_kh*tl_kh/100 : null;
+    _kpiCache['dt_kh_'+m]=dt_kh;  // để renderBOD đọc
     // Tỷ lệ TT = DT BH TT / DT HT TT
     var tl_tt = (ht_tt!==null&&ht_tt>0) ? dt_tt/ht_tt*100 : null;
     // KPI: tỷ lệ TT / tỷ lệ KH
@@ -2227,6 +2249,8 @@ function recalcKPI(){
   for(var m=1;m<=12;m++){
     var tsln_kh=gV('tsln_kh_'+m);
     var tsln_tt=TSLN_ACT[m];
+    // Cache ln_kh = dt_kh * tsln_kh / 100 cho BOD
+    _kpiCache['ln_kh_'+m]=(_kpiCache['dt_kh_'+m]!=null&&tsln_kh!=null)?_kpiCache['dt_kh_'+m]*tsln_kh/100:null;
 
     setC('tsln_tt_'+m, tsln_tt>0?(tsln_tt*100).toFixed(2)+'%':null, 'color:#2d9e5f;font-weight:700');
     setC('tsln_kpi_'+m, tsln_kh!==null&&tsln_tt>0?pctBadge2(tsln_tt*100,tsln_kh):null, 'background:#f0fff4');
@@ -2287,6 +2311,9 @@ function recalcKPI(){
     `<div class="achieve-card" style="border-color:#3182ce;color:#3182ce">${buildAchieve([lastM],'Tháng '+lastM+'/'+lastYear)}</div>`+
     `<div class="achieve-card" style="border-color:#1a6b3c;color:#1a6b3c">${buildAchieve(qMs,qLabel)}</div>`+
     `<div class="achieve-card" style="border-color:#f0a500;color:#f0a500">${buildAchieve(allMs,'Cả năm '+lastYear)}</div>`;
+  // Re-render BOD nếu đang mở để cập nhật mục tiêu từ KPI
+  const _bodP=document.getElementById('page-bod');
+  if(_bodP&&_bodP.style.display!=='none') renderBOD();
 }
 
 // ===== KHỞI TẠO RENDER =====
