@@ -189,7 +189,12 @@ tr:last-child td{border-bottom:none}
   <div class="fg"><label>Thương hiệu</label>
     <select id="fBrand"><option value="">Tất cả</option><option value="PHÚC TEA">PHÚC TEA</option><option value="THE HOA">THE HOA</option></select>
   </div>
-  <div class="fg"><label>Năm</label><select id="fYear" onchange="onYearChange()"><option value="2026">2026</option><option value="2025">2025</option><option value="0" selected>Cả 2 năm</option></select></div><div class="fdiv"></div>
+  <div class="fg"><label>Năm</label><select id="fYear" onchange="onYearChange()"><option value="2026">2026</option><option value="2025">2025</option><option value="0" selected>Cả 2 năm</option></select></div>
+  <div class="fdiv"></div>
+  <div class="fg"><label>Tháng</label>
+    <select id="fMonth" onchange="onMonthChange()"><option value="">Tất cả tháng</option></select>
+  </div>
+  <div class="fdiv"></div>
   <div class="fg"><label>Xem theo</label>
     <select id="fGran"><option value="day">Ngày</option><option value="week">Tuần</option><option value="month" selected>Tháng</option></select>
   </div>
@@ -640,7 +645,7 @@ tr:last-child td{border-bottom:none}
       <tr><td class="left" style="font-weight:700;color:#3182ce;font-size:11px;background:#ebf8ff">= Tỷ lệ DT BH/HT Kết quả (%)</td><td id="tl_tt_1" class="pct-na">–</td><td id="tl_tt_2" class="pct-na">–</td><td id="tl_tt_3" class="pct-na">–</td><td id="tl_tt_4" class="pct-na">–</td><td id="tl_tt_5" class="pct-na">–</td><td id="tl_tt_6" class="pct-na">–</td><td id="tl_tt_7" class="pct-na">–</td><td id="tl_tt_8" class="pct-na">–</td><td id="tl_tt_9" class="pct-na">–</td><td id="tl_tt_10" class="pct-na">–</td><td id="tl_tt_11" class="pct-na">–</td><td id="tl_tt_12" class="pct-na">–</td><td id="tl_tt_total" style="font-weight:700;background:#ebf8ff">–</td></tr>
       <tr><td class="left" style="font-weight:700;font-size:11px;background:#f0fff4">📊 KPI: Tỷ lệ TT / Tỷ lệ Mục tiêu</td><td id="dt_kpi_1" class="pct-na">–</td><td id="dt_kpi_2" class="pct-na">–</td><td id="dt_kpi_3" class="pct-na">–</td><td id="dt_kpi_4" class="pct-na">–</td><td id="dt_kpi_5" class="pct-na">–</td><td id="dt_kpi_6" class="pct-na">–</td><td id="dt_kpi_7" class="pct-na">–</td><td id="dt_kpi_8" class="pct-na">–</td><td id="dt_kpi_9" class="pct-na">–</td><td id="dt_kpi_10" class="pct-na">–</td><td id="dt_kpi_11" class="pct-na">–</td><td id="dt_kpi_12" class="pct-na">–</td><td id="dt_kpi_total" style="font-weight:700;background:#f0fff4">–</td></tr>
     </tbody></table></div>
-    <div class="ksect" style="margin-top:20px">2. Thu hồi Công nợ (VNĐ) — Nhập tay</div>
+    <div class="ksect" style="margin-top:20px">2. Thu hồi Công nợ (VNĐ) — từ Google Sheets</div>
     <div class="kpi-tab-wrap"><table class="kpi-input-table"><thead><tr><th class="left" style="width:190px">Chỉ tiêu</th>
 <th>T1</th>
 <th>T2</th>
@@ -680,7 +685,10 @@ tr:last-child td{border-bottom:none}
 <td><input class="kpi-num tt" id="cn_tt_10" type="text" placeholder="–" onchange="recalcKPI()"></td>
 <td><input class="kpi-num tt" id="cn_tt_11" type="text" placeholder="–" onchange="recalcKPI()"></td>
 <td><input class="kpi-num tt" id="cn_tt_12" type="text" placeholder="–" onchange="recalcKPI()"></td>
-<td id="cn_tt_total" style="font-weight:700">–</td></tr><tr><td class="left" style="font-weight:700;font-size:11px">% Đạt KH</td>
+<td id="cn_tt_total" style="font-weight:700">–</td></tr>
+<tr><td class="left" style="font-weight:700;color:#1a6b3c;font-size:11px">Thu CN BH (TT)</td><td id="cnbh_tt_1">–</td><td id="cnbh_tt_2">–</td><td id="cnbh_tt_3">–</td><td id="cnbh_tt_4">–</td><td id="cnbh_tt_5">–</td><td id="cnbh_tt_6">–</td><td id="cnbh_tt_7">–</td><td id="cnbh_tt_8">–</td><td id="cnbh_tt_9">–</td><td id="cnbh_tt_10">–</td><td id="cnbh_tt_11">–</td><td id="cnbh_tt_12">–</td><td id="cnbh_tt_total" style="font-weight:700">–</td></tr>
+<tr><td class="left" style="font-weight:700;font-size:11px">% CN BH / DT BH</td><td id="cnbh_pct_1" class="pct-na">–</td><td id="cnbh_pct_2" class="pct-na">–</td><td id="cnbh_pct_3" class="pct-na">–</td><td id="cnbh_pct_4" class="pct-na">–</td><td id="cnbh_pct_5" class="pct-na">–</td><td id="cnbh_pct_6" class="pct-na">–</td><td id="cnbh_pct_7" class="pct-na">–</td><td id="cnbh_pct_8" class="pct-na">–</td><td id="cnbh_pct_9" class="pct-na">–</td><td id="cnbh_pct_10" class="pct-na">–</td><td id="cnbh_pct_11" class="pct-na">–</td><td id="cnbh_pct_12" class="pct-na">–</td><td id="cnbh_pct_total" class="pct-na">–</td></tr>
+<tr><td class="left" style="font-weight:700;font-size:11px">% Đạt KH</td>
 <td id="cn_pct_1" class="pct-na">–</td>
 <td id="cn_pct_2" class="pct-na">–</td>
 <td id="cn_pct_3" class="pct-na">–</td>
@@ -795,7 +803,7 @@ function arrow(v,b){if(!b||b===0)return'';const d=((v-b)/b)*100;if(d>0)return`<s
   updateMissMonths();
 })();
 
-function getF(){return{brand:fBrand.value,gran:fGran.value,from:fFrom.value,to:fTo.value,store:fStore.value,cat:fCat.value};}
+function getF(){const _mEl=document.getElementById('fMonth');return{brand:fBrand.value,gran:fGran.value,from:fFrom.value,to:fTo.value,store:fStore.value,cat:fCat.value,month:_mEl?parseInt(_mEl.value)||0:0};}
 function renderAll(){
   renderKPI();
   renderTrend();
@@ -935,6 +943,7 @@ async function fetchSalesFromSheet(){
 
     // Cập nhật dropdown Cửa hàng + Danh mục nếu có
     if(typeof buildFilters==='function') buildFilters();
+    updateMonthDropdown();
 
     // Re-render toàn bộ dashboard
     applyF();
@@ -970,12 +979,118 @@ function updateBadge(){
   el.textContent=years.length===1?String(years[0]):years[0]+' – '+years[years.length-1];
 }
 
+
+// ===== MONTH FILTER =====
+function updateMonthDropdown(){
+  const y=parseInt((document.getElementById('fYear')||{}).value)||0;
+  const data=y===0?D_ALL:D_ALL.filter(r=>r.nam===y);
+  const months=[...new Set(data.map(r=>r.thang).filter(m=>m&&!isNaN(m)))].sort((a,b)=>a-b);
+  const sel=document.getElementById('fMonth');
+  if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML='<option value="">Tất cả tháng</option>';
+  months.forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m; o.textContent='Tháng '+m;
+    if(String(m)===cur) o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function onMonthChange(){
+  const m=parseInt((document.getElementById('fMonth')||{}).value)||0;
+  const y=parseInt((document.getElementById('fYear')||{}).value)||0;
+  const fromEl=document.getElementById('fFrom');
+  const toEl=document.getElementById('fTo');
+  if(m && y && y!==0){
+    const lastDay=new Date(y,m,0).getDate();
+    if(fromEl) fromEl.value=`${y}-${String(m).padStart(2,'0')}-01`;
+    if(toEl)   toEl.value  =`${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  } else if(!m){
+    if(fromEl) fromEl.value='';
+    if(toEl)   toEl.value='';
+  }
+  applyF();
+}
+
+// ===== THU CÔNG NỢ – LIVE DATA =====
+let _cnBH={}, _cnKPI={};
+
+async function fetchCNFromSheet(){
+  const url=`https://docs.google.com/spreadsheets/d/1DR4q16Whx7QFlw3KIPbtR-6RpbDpwQ1MeOyT3faHnu4/gviz/tq?tqx=out:csv&sheet=THU%20C%C3%94NG%20N%E1%BB%A2`;
+  try{
+    const resp=await fetch(url,{cache:'no-store'});
+    if(!resp.ok) throw new Error('HTTP '+resp.status);
+    const text=await resp.text();
+    if(!text||text.trim().startsWith('<')) throw new Error('Sheet chua public');
+    const rows=parseSalesCSV(text);
+    if(rows.length<2) return;
+    _cnBH={}; _cnKPI={};
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];
+      if(r[5]){
+        const d=parseSalesDate(r[5]);
+        if(d){const yr=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7));
+          if(yr&&mo){const k=yr+'-'+mo;_cnBH[k]=(_cnBH[k]||0)+(parseSalesNum(r[6])||0);}}
+      }
+      if(r[9]){
+        const d=parseSalesDate(r[9]);
+        if(d){const yr=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7));
+          if(yr&&mo){const k=yr+'-'+mo;_cnKPI[k]=(_cnKPI[k]||0)+(parseSalesNum(r[10])||0);}}
+      }
+    }
+    applyCNToKPI();
+    console.info('fetchCNFromSheet OK – BH months:',Object.keys(_cnBH).length,'KPI months:',Object.keys(_cnKPI).length);
+  }catch(e){console.warn('fetchCNFromSheet:',e.message);}
+}
+
+function applyCNToKPI(){
+  const fmt=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
+  const dtByM={};
+  D_ALL.filter(r=>r.nam===2026).forEach(r=>{
+    if(r.thang) dtByM[r.thang]=(dtByM[r.thang]||0)+(r.tongThanhTien||0);
+  });
+  let totBH=0,totDT=0;
+  for(let m=1;m<=12;m++){
+    // J:L → cn_tt_m
+    const kv=_cnKPI['2026-'+m]||0;
+    const cnEl=document.getElementById('cn_tt_'+m);
+    if(cnEl&&kv){cnEl.value=fmt(kv);cnEl.classList.add('kpi-sheet-field');cnEl.readOnly=true;}
+    // F:G → cnbh_tt_m
+    const bv=_cnBH['2026-'+m]||0;
+    const dt=dtByM[m]||0;
+    totBH+=bv; totDT+=dt;
+    const bhEl=document.getElementById('cnbh_tt_'+m);
+    if(bhEl) bhEl.textContent=bv?fmt(bv):'–';
+    const pEl=document.getElementById('cnbh_pct_'+m);
+    if(pEl){
+      if(!bv||!dt){pEl.innerHTML='<span class="pct-na">–</span>';}
+      else{const r=bv/dt,p=(r*100).toFixed(1)+'%';
+        const c=r>=1?'pct-cell pct-over':r>=0.8?'pct-cell':'pct-cell pct-low';
+        pEl.innerHTML=`<span class="${c}">${p}</span>`;}
+    }
+  }
+  const bhTot=document.getElementById('cnbh_tt_total');
+  if(bhTot) bhTot.textContent=totBH?fmt(totBH):'–';
+  const pTot=document.getElementById('cnbh_pct_total');
+  if(pTot){
+    if(!totBH||!totDT){pTot.innerHTML='<span class="pct-na">–</span>';}
+    else{const r=totBH/totDT,p=(r*100).toFixed(1)+'%';
+      const c=r>=1?'pct-cell pct-over':r>=0.8?'pct-cell':'pct-cell pct-low';
+      pTot.innerHTML=`<span class="${c}">${p}</span>`;}
+  }
+  if(typeof recalcKPI==='function') recalcKPI();
+}
+
+setInterval(fetchCNFromSheet, 5*60*1000);
+
 function applyF(){
   const f=getF();
   filt=D_CY.filter(r=>{
     if(f.brand&&r.brand!==f.brand)return false;
     if(f.store&&r.chiNhanh!==f.store)return false;
     if(f.cat&&r.loaiHang!==f.cat)return false;
+    if(f.month&&r.thang!==f.month)return false;
     if(f.from&&r.ngay.slice(0,10)<f.from)return false;
     if(f.to&&r.ngay.slice(0,10)>f.to)return false;
     return true;
@@ -985,6 +1100,7 @@ function applyF(){
 }
 function resetF(){
   fBrand.value='';fGran.value='month';fFrom.value='';fTo.value='';fStore.value='';fCat.value='';
+  const _mEl=document.getElementById('fMonth');if(_mEl)_mEl.value='';
   filt=[...D_CY];renderAll();
 }
 
@@ -1415,9 +1531,10 @@ function renderMissPage(){
 function onYearChange(){
   const y=parseInt(document.getElementById('fYear').value);
   D_CY = (!y||y===0) ? D_ALL : D_ALL.filter(r=>r.nam===y);
-  // Clear date filter when switching year
   document.getElementById('fFrom').value='';
   document.getElementById('fTo').value='';
+  const _mEl=document.getElementById('fMonth');if(_mEl)_mEl.value='';
+  updateMonthDropdown();
   applyF();
   updateMissMonths();
   if(document.getElementById('page-miss').style.display!=='none') renderMissPage();
@@ -2174,7 +2291,7 @@ function recalcKPI(){
 
 // ===== KHỞI TẠO RENDER =====
 applyF();
-fetchSalesFromSheet().then(()=>fetchKPIFromSheet());
+fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();});
 </script>
 </body>
 </html>
