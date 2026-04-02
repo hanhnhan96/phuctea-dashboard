@@ -693,7 +693,7 @@ tr:last-child td{border-bottom:none}
 <td><input class="kpi-num tt" id="cn_tt_12" type="text" placeholder="–" onchange="recalcKPI()"></td>
 <td id="cn_tt_total" style="font-weight:700">–</td></tr>
 <tr><td class="left" style="font-weight:700;color:#1a6b3c;font-size:11px">Thu CN BH (TT)</td><td id="cnbh_tt_1">–</td><td id="cnbh_tt_2">–</td><td id="cnbh_tt_3">–</td><td id="cnbh_tt_4">–</td><td id="cnbh_tt_5">–</td><td id="cnbh_tt_6">–</td><td id="cnbh_tt_7">–</td><td id="cnbh_tt_8">–</td><td id="cnbh_tt_9">–</td><td id="cnbh_tt_10">–</td><td id="cnbh_tt_11">–</td><td id="cnbh_tt_12">–</td><td id="cnbh_tt_total" style="font-weight:700">–</td></tr>
-<tr><td class="left" style="font-weight:700;font-size:11px">% CN BH / DT BH</td><td id="cnbh_pct_1" class="pct-na">–</td><td id="cnbh_pct_2" class="pct-na">–</td><td id="cnbh_pct_3" class="pct-na">–</td><td id="cnbh_pct_4" class="pct-na">–</td><td id="cnbh_pct_5" class="pct-na">–</td><td id="cnbh_pct_6" class="pct-na">–</td><td id="cnbh_pct_7" class="pct-na">–</td><td id="cnbh_pct_8" class="pct-na">–</td><td id="cnbh_pct_9" class="pct-na">–</td><td id="cnbh_pct_10" class="pct-na">–</td><td id="cnbh_pct_11" class="pct-na">–</td><td id="cnbh_pct_12" class="pct-na">–</td><td id="cnbh_pct_total" class="pct-na">–</td></tr>
+<tr><td class="left" style="font-weight:700;font-size:11px" title="DT BH đã trừ: THEHOA002, PHUCTEACENTER001, PHUCTEA000 (cửa hàng nhà)">% CN BH / DT BH ⓘ</td><td id="cnbh_pct_1" class="pct-na">–</td><td id="cnbh_pct_2" class="pct-na">–</td><td id="cnbh_pct_3" class="pct-na">–</td><td id="cnbh_pct_4" class="pct-na">–</td><td id="cnbh_pct_5" class="pct-na">–</td><td id="cnbh_pct_6" class="pct-na">–</td><td id="cnbh_pct_7" class="pct-na">–</td><td id="cnbh_pct_8" class="pct-na">–</td><td id="cnbh_pct_9" class="pct-na">–</td><td id="cnbh_pct_10" class="pct-na">–</td><td id="cnbh_pct_11" class="pct-na">–</td><td id="cnbh_pct_12" class="pct-na">–</td><td id="cnbh_pct_total" class="pct-na">–</td></tr>
 <tr><td class="left" style="font-weight:700;font-size:11px">% Đạt KH</td>
 <td id="cn_pct_1" class="pct-na">–</td>
 <td id="cn_pct_2" class="pct-na">–</td>
@@ -794,20 +794,26 @@ const CL=['#1a6b3c','#2d9e5f','#38b2ac','#3182ce','#805ad5','#d69e2e','#e53e3e',
 function dc(id){if(CH[id]){CH[id].destroy();delete CH[id];}}
 function arrow(v,b){if(!b||b===0)return'';const d=((v-b)/b)*100;if(d>0)return`<span class="up">▲ ${d.toFixed(1)}%</span>`;return`<span class="dn">▼ ${Math.abs(d).toFixed(1)}%</span>`;}
 
-// Khởi tạo dropdown
-(function(){
-  const stores=[...new Set(D_CY.map(r=>r.chiNhanh))].sort();
-  const cats=[...new Set(D_CY.map(r=>r.loaiHang))].sort();
+// Khởi tạo dropdown – named function để gọi lại sau khi fetch data xong
+function buildFilters(){
+  const curStore=document.getElementById('fStore').value;
+  const curMStore=document.getElementById('mStore')?document.getElementById('mStore').value:'';
+  const stores=[...new Set(D_CY.map(r=>r.chiNhanh).filter(Boolean))].sort();
+  const cats=[...new Set(D_CY.map(r=>r.loaiHang).filter(Boolean))].sort();
   const catsCatalog=[...new Set(CATALOG.map(r=>r.nhomHang))].sort();
   [document.getElementById('fStore'),document.getElementById('mStore')].forEach(sel=>{
-    stores.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+    if(!sel)return;
+    const prev=sel===document.getElementById('fStore')?curStore:curMStore;
+    sel.innerHTML='<option value="">Tất cả cửa hàng</option>';
+    stores.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;if(s===prev)o.selected=true;sel.appendChild(o);});
   });
   document.getElementById('fCat').innerHTML='<option value="">Tất cả danh mục</option>';
   cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;document.getElementById('fCat').appendChild(o);});
   const mCatEl=document.getElementById('mCat');
   if(mCatEl){mCatEl.innerHTML='<option value="">Tất cả danh mục</option>';catsCatalog.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;mCatEl.appendChild(o);});}
   updateMissMonths();
-})();
+}
+buildFilters();
 
 function getF(){const _mEl=document.getElementById('fMonth');return{brand:fBrand.value,gran:fGran.value,from:fFrom.value,to:fTo.value,store:fStore.value,cat:fCat.value,month:_mEl?parseInt(_mEl.value)||0:0};}
 function renderAll(){
@@ -932,7 +938,11 @@ async function fetchSalesFromSheet(){
             obj[field]=raw||null;
           }
         });
-        if(obj.maHang){allData.push(obj);cnt++;}
+        if(obj.maHang){
+          // LN thực (sau giảm giá) = DT sau GG - Giá vốn
+          obj.lnThuc=(obj.tongThanhTien||0)-(obj.tongGiaVon||0);
+          allData.push(obj);cnt++;
+        }
       }
       console.info(`Tab ${year}: ${cnt} dòng`);
     }
@@ -1054,16 +1064,22 @@ async function fetchCNFromSheet(){
 
 function applyCNToKPI(){
   const fmt=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
+  // Các cửa hàng nhà không ghi nhận thu CN → loại khỏi mẫu DT BH
+  const CN_EXCLUDE=['THEHOA002','PHUCTEACENTER001','PHUCTEA000'];
   const dtByM={};
   D_ALL.filter(r=>r.nam===2026).forEach(r=>{
-    if(r.thang) dtByM[r.thang]=(dtByM[r.thang]||0)+(r.tongThanhTien||0);
+    if(!r.thang) return;
+    const cn=(r.chiNhanh||'').toUpperCase();
+    if(CN_EXCLUDE.some(s=>cn.startsWith(s))) return; // bỏ cửa hàng nhà
+    dtByM[r.thang]=(dtByM[r.thang]||0)+(r.tongThanhTien||0);
   });
   let totBH=0,totDT=0;
   for(let m=1;m<=12;m++){
-    // J:L → cn_tt_m
+    // J:L → cn_tt_m (lưu raw vào _kpiCache để recalcKPI đọc đúng, format cho display)
     const kv=_cnKPI['2026-'+m]||0;
     const cnEl=document.getElementById('cn_tt_'+m);
     if(cnEl&&kv){cnEl.value=fmt(kv);cnEl.classList.add('kpi-sheet-field');cnEl.readOnly=true;}
+    if(kv) _kpiCache['cn_tt_raw_'+m]=kv; // raw number tránh lỗi parse VN format
     // F:G → cnbh_tt_m
     const bv=_cnBH['2026-'+m]||0;
     const dt=dtByM[m]||0;
@@ -1117,8 +1133,8 @@ function renderKPI(){
   if(!filt.length){k0.innerHTML=k1.innerHTML=k2.innerHTML="0";k3.innerHTML="0.0%";k4.innerHTML=k5.innerHTML="0";k0s.innerHTML=k2s.innerHTML="Không có dữ liệu trong kỳ này";return;}
   const dt=filt.reduce((s,r)=>s+r.tongThanhTien,0);
   const sl=filt.reduce((s,r)=>s+r.sl,0);
-  const ln=filt.reduce((s,r)=>s+r.tongLoiNhuan,0);
-  const gg=filt.reduce((s,r)=>s+r.tongGiamGia,0);
+  const ln=filt.reduce((s,r)=>s+(r.lnThuc||0),0);
+  const gg=filt.reduce((s,r)=>s+(r.tongGiamGia||0),0);
   const mg=dt>0?ln/dt:0;
   const ch=new Set(filt.map(r=>r.chiNhanh)).size;
   const months=[...new Set(filt.map(r=>r.thang))].sort();
@@ -1126,8 +1142,8 @@ function renderKPI(){
     const lm=months[months.length-1],pm=months[months.length-2];
     const cD=filt.filter(r=>r.thang===lm).reduce((s,r)=>s+r.tongThanhTien,0);
     const pD=filt.filter(r=>r.thang===pm).reduce((s,r)=>s+r.tongThanhTien,0);
-    const cL=filt.filter(r=>r.thang===lm).reduce((s,r)=>s+r.tongLoiNhuan,0);
-    const pL=filt.filter(r=>r.thang===pm).reduce((s,r)=>s+r.tongLoiNhuan,0);
+    const cL=filt.filter(r=>r.thang===lm).reduce((s,r)=>s+(r.lnThuc||0),0);
+    const pL=filt.filter(r=>r.thang===pm).reduce((s,r)=>s+(r.lnThuc||0),0);
     k0s.innerHTML=`${MN[lm]} ${arrow(cD,pD)} so với ${MN[pm]}`;
     k2s.innerHTML=`${MN[lm]} ${arrow(cL,pL)} so với ${MN[pm]}`;
   }
@@ -1143,7 +1159,7 @@ function renderTrend(){
   filt.forEach(r=>{
     const k=g==='day'?r.ngay.slice(0,10):g==='week'?`T${r.thang}-Tuần ${r.tuan}`:MN[r.thang];
     if(!gr[k])gr[k]={dt:0,ln:0,sl:0};
-    gr[k].dt+=r.tongThanhTien;gr[k].ln+=r.tongLoiNhuan;gr[k].sl+=r.sl;
+    gr[k].dt+=r.tongThanhTien;gr[k].ln+=(r.lnThuc||0);gr[k].sl+=r.sl;
   });
   const lbls=Object.keys(gr).sort();
   const vals=lbls.map(l=>gr[l][tM]);
@@ -1179,7 +1195,7 @@ function renderCat(){
 function setSM(m,el){sM=m;document.querySelectorAll('#sDT,#sLN').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderStoreOv();}
 function renderStoreOv(){
   const gr={};
-  filt.forEach(r=>{if(!gr[r.chiNhanh])gr[r.chiNhanh]={dt:0,ln:0};gr[r.chiNhanh].dt+=r.tongThanhTien;gr[r.chiNhanh].ln+=r.tongLoiNhuan;});
+  filt.forEach(r=>{if(!gr[r.chiNhanh])gr[r.chiNhanh]={dt:0,ln:0};gr[r.chiNhanh].dt+=r.tongThanhTien;gr[r.chiNhanh].ln+=(r.lnThuc||0);});
   const sorted=Object.entries(gr).sort((a,b)=>b[1][sM]-a[1][sM]).slice(0,10);
   const lbs=sorted.map(x=>x[0].replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'').slice(0,20));
   const vals=sorted.map(x=>x[1][sM]);
@@ -1198,7 +1214,7 @@ function renderStoreOv(){
 function renderMComp(){
   const ms=[1,2,3];
   const dt=ms.map(m=>filt.filter(r=>r.thang===m).reduce((s,r)=>s+r.tongThanhTien,0));
-  const ln=ms.map(m=>filt.filter(r=>r.thang===m).reduce((s,r)=>s+r.tongLoiNhuan,0));
+  const ln=ms.map(m=>filt.filter(r=>r.thang===m).reduce((s,r)=>s+(r.lnThuc||0),0));
   dc('mc');
   CH['mc']=new Chart(document.getElementById('cMComp').getContext('2d'),{
     type:'bar',
@@ -1214,22 +1230,29 @@ function renderMComp(){
 
 // ===== TAB SO SÁNH THÁNG =====
 function renderCmpPage(){
-  const ms=[1,2,3];const cols=['#3182ce','#38a169','#f0a500'];
+  // Lấy danh sách tháng có dữ liệu trong D_CY, sắp xếp, lấy tối đa 3 tháng cuối
+  const availMs=[...new Set(D_CY.map(r=>r.thang).filter(m=>m&&!isNaN(m)))].sort((a,b)=>a-b);
+  const ms=availMs.length>=3?availMs.slice(-3):availMs.length>0?availMs:[1,2,3];
+  const cols=['#3182ce','#38a169','#f0a500'];
+  const yearLabel=(()=>{const ys=[...new Set(D_CY.map(r=>r.nam).filter(Boolean))];return ys.length===1?String(ys[0]):'';})();
+  // Cập nhật tiêu đề biểu đồ
+  const cmpChTitle=document.querySelector('#page-cmp .ctitle');
+  if(cmpChTitle)cmpChTitle.textContent=`Biểu đồ so sánh ${ms.map(m=>MN[m]).join(' / ')}${yearLabel?' – '+yearLabel:''}`;
   const mD=ms.map(m=>{
     const rows=D_CY.filter(r=>r.thang===m);
     const dt=rows.reduce((s,r)=>s+r.tongThanhTien,0);
-    const ln=rows.reduce((s,r)=>s+r.tongLoiNhuan,0);
+    const ln=rows.reduce((s,r)=>s+(r.lnThuc||0),0);
     const sl=rows.reduce((s,r)=>s+r.sl,0);
-    const gg=rows.reduce((s,r)=>s+r.tongGiamGia,0);
-    const gv=rows.reduce((s,r)=>s+r.tongGiaVon,0);
+    const gg=rows.reduce((s,r)=>s+(r.tongGiamGia||0),0);
+    const gv=rows.reduce((s,r)=>s+(r.tongGiaVon||0),0);
     const ch=new Set(rows.map(r=>r.chiNhanh)).size;
     return{dt,ln,sl,gg,gv,ch,mg:dt>0?ln/dt:0};
   });
   let h='';
   ms.forEach((m,i)=>{
     const d=mD[i],prev=i>0?mD[i-1]:null;
-    h+=`<div class="mc" style="border-color:${cols[i]}">
-      <h3 style="color:${cols[i]}">${MN[m]} 2026</h3>
+    h+=`<div class="mc" style="border-color:${cols[i%3]}">
+      <h3 style="color:${cols[i%3]}">${MN[m]}${yearLabel?' '+yearLabel:''}</h3>
       <div class="mr"><span class="mn">Doanh Thu</span><span class="mv">${fmtB(d.dt)}</span></div>
       <div class="mr"><span class="mn">Lợi Nhuận</span><span class="mv">${fmtB(d.ln)}</span></div>
       <div class="mr"><span class="mn">Biên LN</span><span class="mv" style="color:${d.mg>=.3?'#2d9e5f':d.mg>=.2?'#d69e2e':'#e53e3e'}">${pct(d.mg)}</span></div>
@@ -1245,9 +1268,9 @@ function renderCmpPage(){
   CH['cD']=new Chart(document.getElementById('cCmpDetail').getContext('2d'),{
     type:'bar',
     data:{labels:ms.map(m=>MN[m]),datasets:[
-      {label:'Doanh thu',data:mD_CY.map(d=>d.dt),backgroundColor:'#1a6b3c99',borderRadius:5,borderSkipped:false},
-      {label:'Lợi nhuận',data:mD_CY.map(d=>d.ln),backgroundColor:'#3182ce99',borderRadius:5,borderSkipped:false},
-      {label:'Giá vốn',data:mD_CY.map(d=>d.gv),backgroundColor:'#e53e3e77',borderRadius:5,borderSkipped:false}
+      {label:'Doanh thu',data:mD.map(d=>d.dt),backgroundColor:'#1a6b3c99',borderRadius:5,borderSkipped:false},
+      {label:'Lợi nhuận',data:mD.map(d=>d.ln),backgroundColor:'#3182ce99',borderRadius:5,borderSkipped:false},
+      {label:'Giá vốn',data:mD.map(d=>d.gv),backgroundColor:'#e53e3e77',borderRadius:5,borderSkipped:false}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top'},datalabels:{anchor:'end',align:'top',font:{size:10,weight:'bold'},formatter:v=>fmtB(v),color:'#333'}},
@@ -1273,7 +1296,7 @@ function renderStPage(){
   const gr={};
   D_CY.forEach(r=>{
     if(!gr[r.chiNhanh])gr[r.chiNhanh]={dt:0,ln:0,sl:0,gg:0,brand:r.chiNhanh.startsWith('THEHOA')?'THE HOA':'PHÚC TEA'};
-    gr[r.chiNhanh].dt+=r.tongThanhTien;gr[r.chiNhanh].ln+=r.tongLoiNhuan;gr[r.chiNhanh].sl+=r.sl;gr[r.chiNhanh].gg+=r.tongGiamGia;
+    gr[r.chiNhanh].dt+=r.tongThanhTien;gr[r.chiNhanh].ln+=(r.lnThuc||0);gr[r.chiNhanh].sl+=r.sl;gr[r.chiNhanh].gg+=(r.tongGiamGia||0);
   });
   const sorted=Object.entries(gr).sort((a,b)=>b[1].dt-a[1].dt);
   const total=sorted.reduce((s,x)=>s+x[1].dt,0);
@@ -1320,9 +1343,9 @@ function renderPdPage(){
   const gr={},cgr={};
   D_CY.forEach(r=>{
     if(!gr[r.sanPham])gr[r.sanPham]={dt:0,ln:0,sl:0,cat:r.loaiHang};
-    gr[r.sanPham].dt+=r.tongThanhTien;gr[r.sanPham].ln+=r.tongLoiNhuan;gr[r.sanPham].sl+=r.sl;
+    gr[r.sanPham].dt+=r.tongThanhTien;gr[r.sanPham].ln+=(r.lnThuc||0);gr[r.sanPham].sl+=r.sl;
     if(!cgr[r.loaiHang])cgr[r.loaiHang]={dt:0,sl:0,ln:0};
-    cgr[r.loaiHang].dt+=r.tongThanhTien;cgr[r.loaiHang].sl+=r.sl;cgr[r.loaiHang].ln+=r.tongLoiNhuan;
+    cgr[r.loaiHang].dt+=r.tongThanhTien;cgr[r.loaiHang].sl+=r.sl;cgr[r.loaiHang].ln+=(r.lnThuc||0);
   });
   const sorted=Object.entries(gr).sort((a,b)=>b[1].dt-a[1].dt);
   const total=sorted.reduce((s,x)=>s+x[1].dt,0);
@@ -1561,7 +1584,7 @@ function renderYoY(){
     return r;
   }
   function sumDT(rows){return rows.reduce((s,r)=>s+(r.tongThanhTien||0),0);}
-  function sumLN(rows){return rows.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);}
+  function sumLN(rows){return rows.reduce((s,r)=>s+(r.lnThuc||0),0);}
   function sumSL(rows){return rows.reduce((s,r)=>s+(r.sl||0),0);}
   function calcTSLN(rows){const dt=sumDT(rows);return dt>0?sumLN(rows)/dt:0;}
   function growthLbl(a,b){
@@ -1757,7 +1780,8 @@ function renderBOD(){
     return r;
   }
   function sumF(arr,f){return arr.reduce((s,r)=>s+(r[f]||0),0);}
-  function tsln(arr){const dt=sumF(arr,'tongThanhTien');return dt>0?sumF(arr,'tongLoiNhuan')/dt:0;}
+  function tsln(arr){const dt=sumF(arr,'tongThanhTien');return dt>0?sumF(arr,'lnThuc')/dt:0;}
+  function tsln_truoc(arr){const dt=sumF(arr,'thanhTien');return dt>0?sumF(arr,'tongLoiNhuan')/dt:0;}
 
   // Lấy targets từ localStorage (KPI tab)
   function getKH(field,month){
@@ -1780,8 +1804,8 @@ function renderBOD(){
   const rDay=rows('day'), rMon=rows('month'), rQ=rows('quarter'), rY=data2026;
   const dt_d=sumF(rDay,'tongThanhTien'), dt_m=sumF(rMon,'tongThanhTien');
   const dt_q=sumF(rQ,'tongThanhTien'), dt_y=sumF(rY,'tongThanhTien');
-  const ln_d=sumF(rDay,'tongLoiNhuan'), ln_m=sumF(rMon,'tongLoiNhuan');
-  const ln_q=sumF(rQ,'tongLoiNhuan'), ln_y=sumF(rY,'tongLoiNhuan');
+  const ln_d=sumF(rDay,'lnThuc'), ln_m=sumF(rMon,'lnThuc');
+  const ln_q=sumF(rQ,'lnThuc'), ln_y=sumF(rY,'lnThuc');
 
   // Cập nhật header
   const lastDateStr=`${String(lastDay).padStart(2,'0')}/${String(lastMonth).padStart(2,'0')}/${lastYear}`;
@@ -1822,12 +1846,28 @@ function renderBOD(){
 
   // LN + TSLN cells
   const ln_kh_d = ln_kh_m ? ln_kh_m * paceRatio : null;
+  // TSLN KH từ _kpiCache (dạng % số, vd 27 → ratio 0.27)
+  const tsln_kh_m_v = _kpiCache['tsln_kh_'+lastMonth]!=null ? _kpiCache['tsln_kh_'+lastMonth]/100 : null;
+  const tsln_kh_q_vals = qMonth.map(m=>_kpiCache['tsln_kh_'+m]).filter(v=>v!=null);
+  const tsln_kh_q_v = tsln_kh_q_vals.length ? tsln_kh_q_vals.reduce((s,v)=>s+v,0)/tsln_kh_q_vals.length/100 : null;
+  const tsln_kh_y_vals = [...Array(12).keys()].map(i=>_kpiCache['tsln_kh_'+(i+1)]).filter(v=>v!=null);
+  const tsln_kh_y_v = tsln_kh_y_vals.length ? tsln_kh_y_vals.reduce((s,v)=>s+v,0)/tsln_kh_y_vals.length/100 : null;
+  function cellLN(label, arr, kh_ratio, ln_val, ln_kh){
+    const tr=tsln_truoc(arr), sa=tsln(arr);
+    const cfn=(v,t)=>v>=t?'#2d9e5f':v>=t*0.85?'#d69e2e':'#e53e3e';
+    const valHtml=`<div class="bod-cell-val">${pct(tr)}</div>`;
+    const subHtml=`<div class="bod-cell-target">Sau GG: ${pct(sa)}`+(kh_ratio!=null?` | KH: ${pct(kh_ratio)}`:'')+'</div>';
+    const achHtml=kh_ratio!=null&&tr>0?`<div class="bod-cell-pct" style="color:${cfn(tr,kh_ratio)}">Đạt ${(tr/kh_ratio*100).toFixed(1)}% KH (trước GG)</div>`:'';
+    const barW=kh_ratio!=null&&tr>0?Math.min(100,tr/kh_ratio*100).toFixed(0):0;
+    const barHtml=kh_ratio!=null?`<div class="bod-progress"><div class="bod-progress-bar" style="width:${barW}%;background:${cfn(tr,kh_ratio||tr)}"></div></div>`:'';
+    const lnHtml=ln_kh?`<div class="bod-cell-target" style="font-size:10px">LN TT: ${fmtB(ln_val)} / KH: ${fmtB(ln_kh)}</div>`:ln_val?`<div class="bod-cell-target" style="font-size:10px">LN: ${fmtB(ln_val)}</div>`:'';
+    return `<div class="bod-cell"><div class="bod-cell-label">${label}</div>${valHtml}${subHtml}${achHtml}${lnHtml}${barHtml}</div>`;
+  }
   document.getElementById('bodLNGrid').innerHTML =
-    `<div class="bod-cell"><div class="bod-cell-label">TSLN Trong ngày</div><div class="bod-cell-val">${pct(tsln(rDay))}</div><div class="bod-cell-target">LN: ${fmtB(ln_d)}</div></div>` +
-    `<div class="bod-cell"><div class="bod-cell-label">TSLN T${lastMonth}</div><div class="bod-cell-val">${pct(tsln(rMon))}</div>${ln_kh_m?`<div class="bod-cell-target">KH LN: ${fmtB(ln_kh_m)}</div><div class="bod-cell-pct" style="color:${ln_m/ln_kh_m>=1?'#2d9e5f':ln_m/ln_kh_m>=0.7?'#d69e2e':'#e53e3e'}">Đạt ${(ln_m/ln_kh_m*100).toFixed(1)}%</div>`:'<div class="bod-cell-target">LN: '+fmtB(ln_m)+'</div>'}` +
-    `<div class="bod-progress">${ln_kh_m?`<div class="bod-progress-bar" style="width:${Math.min(100,ln_m/ln_kh_m*100).toFixed(0)}%;background:${ln_m/ln_kh_m>=1?'#2d9e5f':ln_m/ln_kh_m>=0.7?'#d69e2e':'#e53e3e'}"></div>`:''}</div></div>` +
-    `<div class="bod-cell"><div class="bod-cell-label">TSLN Q${Math.ceil(lastMonth/3)}</div><div class="bod-cell-val">${pct(tsln(rQ))}</div><div class="bod-cell-target">LN: ${fmtB(ln_q)}</div></div>` +
-    `<div class="bod-cell"><div class="bod-cell-label">TSLN Năm</div><div class="bod-cell-val">${pct(tsln(rY))}</div><div class="bod-cell-target">LN: ${fmtB(ln_y)}</div></div>`;
+    cellLN('TSLN Trong ngày', rDay, tsln_kh_m_v, ln_d, ln_kh_d) +
+    cellLN(`TSLN T${lastMonth}`, rMon, tsln_kh_m_v, ln_m, ln_kh_m) +
+    cellLN(`TSLN Q${Math.ceil(lastMonth/3)}`, rQ, tsln_kh_q_v, ln_q, ln_kh_q) +
+    cellLN('TSLN Năm', rY, tsln_kh_y_v, ln_y, ln_kh_y);
 
   // Tỷ lệ DT/HT cells
   const tl_d = ht_tt_m&&ht_tt_m>0 ? dt_d*daysInMonth/lastDay/ht_tt_m : null; // ước tính
@@ -1846,7 +1886,7 @@ function renderBOD(){
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if(!dayMap[k])dayMap[k]={dt:0,ln:0,sl:0};
     dayMap[k].dt+=r.tongThanhTien||0;
-    dayMap[k].ln+=r.tongLoiNhuan||0;
+    dayMap[k].ln+=(r.lnThuc||0);
     dayMap[k].sl+=r.sl||0;
   });
   const sortedDays=Object.keys(dayMap).sort().reverse().slice(0,7);
@@ -1896,7 +1936,7 @@ function renderBODGroup(period, tabEl){
     const g=r.loaiHang||'Khác';
     if(!map[g]) map[g]={dt:0,ln:0};
     map[g].dt+=(r.tongThanhTien||0);
-    map[g].ln+=(r.tongLoiNhuan||0);
+    map[g].ln+=(r.lnThuc||0);
   });
 
   const totalDT=Object.values(map).reduce((s,v)=>s+v.dt,0);
@@ -1956,7 +1996,7 @@ function copyBOD(){
   function sumF(arr,f){return arr.reduce((s,r)=>s+(r[f]||0),0);}
   const rDay=rows('day'),rMon=rows('month'),rY=data2026;
   const dt_d=sumF(rDay,'tongThanhTien'),dt_m=sumF(rMon,'tongThanhTien'),dt_y=sumF(rY,'tongThanhTien');
-  const ln_d=sumF(rDay,'tongLoiNhuan'),ln_m=sumF(rMon,'tongLoiNhuan');
+  const ln_d=sumF(rDay,'lnThuc'),ln_m=sumF(rMon,'lnThuc');
   const tsln_d=dt_d>0?ln_d/dt_d:0, tsln_m=dt_m>0?ln_m/dt_m:0;
   const dt_kh_m=pN(document.getElementById('dt_kh_'+lastMonth)?.value);
   const ach_m=dt_kh_m?`(${(dt_m/dt_kh_m*100).toFixed(1)}% KH)`:'';
@@ -2123,6 +2163,16 @@ function applySheetKPI(rows){
   const R_TL_KH=findRow('Tỷ lệ DT BH/HT Mục tiêu');
   const R_HT_TT=findRow('DT Hệ thống Kết quả');
   const R_CN_KH=findKHRow();
+  // Tìm row TSLN KH: sau section 'Tỷ suất lợi nhuận' là row 'Kế hoạch'
+  function findTSLNRow(){
+    let inSec=false;
+    for(const r of rows){
+      if(r[0]&&r[0].includes('Tỷ suất lợi nhuận'))inSec=true;
+      if(inSec&&r[0]&&r[0].trim()==='Kế hoạch')return r;
+    }
+    return [];
+  }
+  const R_TSLN_KH=findTSLNRow();
 
   // Col index: col[1]=TỔNG, col[2]=T1, col[3]=T2, ..., col[13]=T12
   for(let m=1;m<=12;m++){
@@ -2131,6 +2181,11 @@ function applySheetKPI(rows){
     setSheetField('tl_kh_'+m, R_TL_KH[ci]);
     setSheetField('ht_tt_'+m, R_HT_TT[ci]);
     setSheetField('cn_kh_'+m, R_CN_KH[ci]);
+    // Cache TSLN KH vào _kpiCache (lưu dạng % số, vd 27 cho 27%)
+    if(R_TSLN_KH[ci]!==undefined){
+      const v=parseSalesNum(R_TSLN_KH[ci]);
+      if(!isNaN(v))_kpiCache['tsln_kh_'+m]=v*100; // parseSalesNum ÷100 → nhân lại
+    }
   }
   console.log('[Sheet] ht_kh T1=',R_HT_KH[2],' tl_kh T1=',R_TL_KH[2],' cn_kh T1=',R_CN_KH[2]);
   // Tính dt_kh / ln_kh vào cache để BOD đọc được
@@ -2165,13 +2220,16 @@ function recalcKPI(){
   for(var m=1;m<=12;m++){
     DT_ACT[m]=D_ALL.filter(r=>r.nam===2026&&r.thang===m).reduce((s,r)=>s+(r.tongThanhTien||0),0);
   }
-  // TSLN thực tế (trước giảm giá): tongLoiNhuan / thanhTien
-  var TSLN_ACT={};
+  // TSLN thực tế: trước GG = tongLoiNhuan/thanhTien, sau GG = tongLoiNhuan/tongThanhTien
+  var TSLN_ACT={}, TSLN_SAU={};
   for(var m=1;m<=12;m++){
     var rows=D_ALL.filter(r=>r.nam===2026&&r.thang===m);
     var dt_truoc=rows.reduce((s,r)=>s+(r.thanhTien||0),0);
-    var ln=rows.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);
-    TSLN_ACT[m]=dt_truoc>0?ln/dt_truoc:0;
+    var dt_sau=rows.reduce((s,r)=>s+(r.tongThanhTien||0),0);
+    var ln=rows.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);  // tongLoiNhuan cho TSLN trước GG
+    var lnS=rows.reduce((s,r)=>s+(r.lnThuc||0),0);       // lnThuc cho TSLN sau GG
+    TSLN_ACT[m]=dt_truoc>0?ln/dt_truoc:0;  // trước GG
+    TSLN_SAU[m]=dt_sau>0?lnS/dt_sau:0;      // sau GG
   }
 
   function gV(id){const el=document.getElementById(id);return el&&el.value?pN(el.value):null;}
@@ -2236,7 +2294,9 @@ function recalcKPI(){
   let cn_kh_sum=0,cn_tt_sum=0,cn_kh_cnt=0,cn_tt_cnt=0;
   for(var m=1;m<=12;m++){
     const kh=pN(document.getElementById('cn_kh_'+m)&&document.getElementById('cn_kh_'+m).value);
-    const tt=pN(document.getElementById('cn_tt_'+m)&&document.getElementById('cn_tt_'+m).value);
+    // Dùng raw cache (cn_tt được fmt VN → pN() sẽ đọc sai); fallback sang pN nếu nhập tay
+    const tt=_kpiCache['cn_tt_raw_'+m]!==undefined ? _kpiCache['cn_tt_raw_'+m]
+            : pN(document.getElementById('cn_tt_'+m)&&document.getElementById('cn_tt_'+m).value);
     const pe=document.getElementById('cn_pct_'+m);
     if(pe)pe.innerHTML=pctBadge(tt,kh);
     if(kh!==null){cn_kh_sum+=kh;cn_kh_cnt++;}
@@ -2249,12 +2309,16 @@ function recalcKPI(){
   // ── SECTION 3: TSLN ────────────────────────────────────────
   var tsln_kh_sum=0,tsln_kh_cnt=0;
   for(var m=1;m<=12;m++){
-    var tsln_kh=gV('tsln_kh_'+m);
+    // Dùng _kpiCache (từ sheet) trước, fallback sang DOM input
+    var tsln_kh=(_kpiCache['tsln_kh_'+m]!==undefined)?_kpiCache['tsln_kh_'+m]:gV('tsln_kh_'+m);
     var tsln_tt=TSLN_ACT[m];
     // Cache ln_kh = dt_kh * tsln_kh / 100 cho BOD
     _kpiCache['ln_kh_'+m]=(_kpiCache['dt_kh_'+m]!=null&&tsln_kh!=null)?_kpiCache['dt_kh_'+m]*tsln_kh/100:null;
 
-    setC('tsln_tt_'+m, tsln_tt>0?(tsln_tt*100).toFixed(2)+'%':null, 'color:#2d9e5f;font-weight:700');
+    var tsln_sau=TSLN_SAU[m]||0;
+    var tsln_label=tsln_tt>0?`<span title='Trước GG'>${(tsln_tt*100).toFixed(1)}%</span>`+
+      (tsln_sau>0?`<span style='font-size:10px;color:#6b7a8d;margin-left:4px' title='Sau GG'>(${(tsln_sau*100).toFixed(1)}%)</span>`:''):null;
+    setC('tsln_tt_'+m, tsln_label, 'color:#2d9e5f;font-weight:700');
     setC('tsln_kpi_'+m, tsln_kh!==null&&tsln_tt>0?pctBadge2(tsln_tt*100,tsln_kh):null, 'background:#f0fff4');
 
     if(tsln_kh!==null){tsln_kh_sum+=tsln_kh;tsln_kh_cnt++;}
@@ -2263,7 +2327,7 @@ function recalcKPI(){
   // TSLN TT tổng (cả năm, trước GG)
   var rows_all=D_ALL.filter(r=>r.nam===2026);
   var dt_truoc_all=rows_all.reduce((s,r)=>s+(r.thanhTien||0),0);
-  var ln_all=rows_all.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);
+  var ln_all=rows_all.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);  // trước GG cho TSLN
   var tsln_tt_all=dt_truoc_all>0?ln_all/dt_truoc_all:0;
   if(eTot('tsln_tt_total'))eTot('tsln_tt_total').innerHTML=(tsln_tt_all*100).toFixed(2)+'%';
   if(eTot('tsln_kpi_total')&&tsln_kh_cnt>0)eTot('tsln_kpi_total').innerHTML=pctBadge2(tsln_tt_all*100,tsln_kh_sum/tsln_kh_cnt);
@@ -2283,14 +2347,14 @@ function recalcKPI(){
     const ht_tt_s=months.reduce((s,m)=>{const v=gV('ht_tt_'+m);return s+(v||0);},0);
     const dt_tt_s=months.reduce((s,m)=>s+DT_ACT[m],0);
     const tl_tt_avg=ht_tt_s>0?dt_tt_s/ht_tt_s*100:null;
-    const tsln_kh_vs=months.map(m=>gV('tsln_kh_'+m)).filter(x=>x!==null);
+    const tsln_kh_vs=months.map(m=>(_kpiCache['tsln_kh_'+m]!==undefined?_kpiCache['tsln_kh_'+m]:gV('tsln_kh_'+m))).filter(x=>x!==null);
     const tsln_kh_avg=tsln_kh_vs.length?tsln_kh_vs.reduce((s,v)=>s+v,0)/tsln_kh_vs.length:null;
     const rows_m=D_ALL.filter(r=>r.nam===2026&&months.includes(r.thang));
     const dt_tr_m=rows_m.reduce((s,r)=>s+(r.thanhTien||0),0);
-    const ln_m=rows_m.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);
+    const ln_m=rows_m.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);  // trước GG cho TSLN
     const tsln_tt_avg=dt_tr_m>0?ln_m/dt_tr_m*100:0;
     const cn_kh_s=months.reduce((s,m)=>{const v=gV('cn_kh_'+m);return s+(v||0);},0);
-    const cn_tt_s=months.reduce((s,m)=>{const v=gV('cn_tt_'+m);return s+(v||0);},0);
+    const cn_tt_s=months.reduce((s,m)=>s+(_kpiCache['cn_tt_raw_'+m]!==undefined?_kpiCache['cn_tt_raw_'+m]:(gV('cn_tt_'+m)||0)),0);
 
     const hasKH=ht_kh_s>0||dt_kh_s;
     if(!hasKH)return `<h4 style="color:inherit">${label}</h4><div class="achieve-row"><span class="achieve-label">Chưa nhập kế hoạch</span></div>`;
