@@ -787,7 +787,7 @@ const CATALOG=[{"maHang":"NVL010171","tenHang":"Xí Muội Thái","giaBan":90000
 const CH={};
 let filt=[...D],tM='dt',sM='dt';
 const fmt=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
-const fmtB=n=>{if(n>=1e9)return(n/1e9).toFixed(2)+' tỷ';if(n>=1e6)return(n/1e6).toFixed(1)+' tr';return fmt(n)};
+const fmtB=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
 const pct=n=>(n*100).toFixed(1)+'%';
 const MN=['','Tháng 1','Tháng 2','Tháng 3','Tháng 4','Tháng 5','Tháng 6','Tháng 7','Tháng 8','Tháng 9','Tháng 10','Tháng 11','Tháng 12'];
 const CL=['#1a6b3c','#2d9e5f','#38b2ac','#3182ce','#805ad5','#d69e2e','#e53e3e','#f6ad55','#68d391','#76e4f7','#a78bfa','#fc8181','#9ae6b4','#bee3f8','#e9d8fd'];
@@ -940,7 +940,7 @@ async function fetchSalesFromSheet(){
         });
         if(obj.maHang){
           // LN thực (sau giảm giá) = DT sau GG - Giá vốn
-          obj.lnThuc=(obj.tongThanhTien||0)-(obj.tongGiaVon||0);
+          obj.lnThuc=(obj.thanhTien||0)-(obj.tongGiaVon||0); // LN trên DT chưa GG
           allData.push(obj);cnt++;
         }
       }
@@ -1071,7 +1071,7 @@ function applyCNToKPI(){
     if(!r.thang) return;
     const cn=(r.chiNhanh||'').toUpperCase();
     if(CN_EXCLUDE.some(s=>cn.startsWith(s))) return; // bỏ cửa hàng nhà
-    dtByM[r.thang]=(dtByM[r.thang]||0)+(r.tongThanhTien||0);
+    dtByM[r.thang]=(dtByM[r.thang]||0)+(r.thanhTien||0);
   });
   let totBH=0,totDT=0;
   for(let m=1;m<=12;m++){
@@ -1131,7 +1131,7 @@ function resetF(){
 // ===== KPI =====
 function renderKPI(){
   if(!filt.length){k0.innerHTML=k1.innerHTML=k2.innerHTML="0";k3.innerHTML="0.0%";k4.innerHTML=k5.innerHTML="0";k0s.innerHTML=k2s.innerHTML="Không có dữ liệu trong kỳ này";return;}
-  const dt=filt.reduce((s,r)=>s+r.tongThanhTien,0);
+  const dt=filt.reduce((s,r)=>s+(r.thanhTien||0),0);
   const sl=filt.reduce((s,r)=>s+r.sl,0);
   const ln=filt.reduce((s,r)=>s+(r.lnThuc||0),0);
   const gg=filt.reduce((s,r)=>s+(r.tongGiamGia||0),0);
@@ -1140,8 +1140,8 @@ function renderKPI(){
   const months=[...new Set(filt.map(r=>r.thang))].sort();
   if(months.length>=2){
     const lm=months[months.length-1],pm=months[months.length-2];
-    const cD=filt.filter(r=>r.thang===lm).reduce((s,r)=>s+r.tongThanhTien,0);
-    const pD=filt.filter(r=>r.thang===pm).reduce((s,r)=>s+r.tongThanhTien,0);
+    const cD=filt.filter(r=>r.thang===lm).reduce((s,r)=>s+(r.thanhTien||0),0);
+    const pD=filt.filter(r=>r.thang===pm).reduce((s,r)=>s+(r.thanhTien||0),0);
     const cL=filt.filter(r=>r.thang===lm).reduce((s,r)=>s+(r.lnThuc||0),0);
     const pL=filt.filter(r=>r.thang===pm).reduce((s,r)=>s+(r.lnThuc||0),0);
     k0s.innerHTML=`${MN[lm]} ${arrow(cD,pD)} so với ${MN[pm]}`;
@@ -1159,7 +1159,7 @@ function renderTrend(){
   filt.forEach(r=>{
     const k=g==='day'?r.ngay.slice(0,10):g==='week'?`T${r.thang}-Tuần ${r.tuan}`:MN[r.thang];
     if(!gr[k])gr[k]={dt:0,ln:0,sl:0};
-    gr[k].dt+=r.tongThanhTien;gr[k].ln+=(r.lnThuc||0);gr[k].sl+=r.sl;
+    gr[k].dt+=(r.thanhTien||0);gr[k].ln+=(r.lnThuc||0);gr[k].sl+=r.sl;
   });
   const lbls=Object.keys(gr).sort();
   const vals=lbls.map(l=>gr[l][tM]);
@@ -1195,7 +1195,7 @@ function renderCat(){
 function setSM(m,el){sM=m;document.querySelectorAll('#sDT,#sLN').forEach(b=>b.classList.remove('on'));el.classList.add('on');renderStoreOv();}
 function renderStoreOv(){
   const gr={};
-  filt.forEach(r=>{if(!gr[r.chiNhanh])gr[r.chiNhanh]={dt:0,ln:0};gr[r.chiNhanh].dt+=r.tongThanhTien;gr[r.chiNhanh].ln+=(r.lnThuc||0);});
+  filt.forEach(r=>{if(!gr[r.chiNhanh])gr[r.chiNhanh]={dt:0,ln:0};gr[r.chiNhanh].dt+=(r.thanhTien||0);gr[r.chiNhanh].ln+=(r.lnThuc||0);});
   const sorted=Object.entries(gr).sort((a,b)=>b[1][sM]-a[1][sM]).slice(0,10);
   const lbs=sorted.map(x=>x[0].replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'').slice(0,20));
   const vals=sorted.map(x=>x[1][sM]);
@@ -1213,7 +1213,7 @@ function renderStoreOv(){
 // ===== SO SÁNH THÁNG (OVERVIEW) =====
 function renderMComp(){
   const ms=[1,2,3];
-  const dt=ms.map(m=>filt.filter(r=>r.thang===m).reduce((s,r)=>s+r.tongThanhTien,0));
+  const dt=ms.map(m=>filt.filter(r=>r.thang===m).reduce((s,r)=>s+(r.thanhTien||0),0));
   const ln=ms.map(m=>filt.filter(r=>r.thang===m).reduce((s,r)=>s+(r.lnThuc||0),0));
   dc('mc');
   CH['mc']=new Chart(document.getElementById('cMComp').getContext('2d'),{
@@ -1240,7 +1240,7 @@ function renderCmpPage(){
   if(cmpChTitle)cmpChTitle.textContent=`Biểu đồ so sánh ${ms.map(m=>MN[m]).join(' / ')}${yearLabel?' – '+yearLabel:''}`;
   const mD=ms.map(m=>{
     const rows=D_CY.filter(r=>r.thang===m);
-    const dt=rows.reduce((s,r)=>s+r.tongThanhTien,0);
+    const dt=rows.reduce((s,r)=>s+(r.thanhTien||0),0);
     const ln=rows.reduce((s,r)=>s+(r.lnThuc||0),0);
     const sl=rows.reduce((s,r)=>s+r.sl,0);
     const gg=rows.reduce((s,r)=>s+(r.tongGiamGia||0),0);
@@ -1296,7 +1296,7 @@ function renderStPage(){
   const gr={};
   D_CY.forEach(r=>{
     if(!gr[r.chiNhanh])gr[r.chiNhanh]={dt:0,ln:0,sl:0,gg:0,brand:r.chiNhanh.startsWith('THEHOA')?'THE HOA':'PHÚC TEA'};
-    gr[r.chiNhanh].dt+=r.tongThanhTien;gr[r.chiNhanh].ln+=(r.lnThuc||0);gr[r.chiNhanh].sl+=r.sl;gr[r.chiNhanh].gg+=(r.tongGiamGia||0);
+    gr[r.chiNhanh].dt+=(r.thanhTien||0);gr[r.chiNhanh].ln+=(r.lnThuc||0);gr[r.chiNhanh].sl+=r.sl;gr[r.chiNhanh].gg+=(r.tongGiamGia||0);
   });
   const sorted=Object.entries(gr).sort((a,b)=>b[1].dt-a[1].dt);
   const total=sorted.reduce((s,x)=>s+x[1].dt,0);
@@ -1343,9 +1343,9 @@ function renderPdPage(){
   const gr={},cgr={};
   D_CY.forEach(r=>{
     if(!gr[r.sanPham])gr[r.sanPham]={dt:0,ln:0,sl:0,cat:r.loaiHang};
-    gr[r.sanPham].dt+=r.tongThanhTien;gr[r.sanPham].ln+=(r.lnThuc||0);gr[r.sanPham].sl+=r.sl;
+    gr[r.sanPham].dt+=(r.thanhTien||0);gr[r.sanPham].ln+=(r.lnThuc||0);gr[r.sanPham].sl+=r.sl;
     if(!cgr[r.loaiHang])cgr[r.loaiHang]={dt:0,sl:0,ln:0};
-    cgr[r.loaiHang].dt+=r.tongThanhTien;cgr[r.loaiHang].sl+=r.sl;cgr[r.loaiHang].ln+=(r.lnThuc||0);
+    cgr[r.loaiHang].dt+=(r.thanhTien||0);cgr[r.loaiHang].sl+=r.sl;cgr[r.loaiHang].ln+=(r.lnThuc||0);
   });
   const sorted=Object.entries(gr).sort((a,b)=>b[1].dt-a[1].dt);
   const total=sorted.reduce((s,x)=>s+x[1].dt,0);
@@ -1583,7 +1583,7 @@ function renderYoY(){
     if(month) r=r.filter(x=>x.thang===month);
     return r;
   }
-  function sumDT(rows){return rows.reduce((s,r)=>s+(r.tongThanhTien||0),0);}
+  function sumDT(rows){return rows.reduce((s,r)=>s+(r.thanhTien||0),0);}
   function sumLN(rows){return rows.reduce((s,r)=>s+(r.lnThuc||0),0);}
   function sumSL(rows){return rows.reduce((s,r)=>s+(r.sl||0),0);}
   function calcTSLN(rows){const dt=sumDT(rows);return dt>0?sumLN(rows)/dt:0;}
@@ -1781,7 +1781,7 @@ function renderBOD(){
   }
   function sumF(arr,f){return arr.reduce((s,r)=>s+(r[f]||0),0);}
   function tsln(arr){const dt=sumF(arr,'tongThanhTien');return dt>0?sumF(arr,'lnThuc')/dt:0;}
-  function tsln_truoc(arr){const dt=sumF(arr,'thanhTien');return dt>0?sumF(arr,'tongLoiNhuan')/dt:0;}
+  function tsln_truoc(arr){const dt=sumF(arr,'thanhTien');return dt>0?sumF(arr,'lnThuc')/dt:0;}
 
   // Lấy targets từ localStorage (KPI tab)
   function getKH(field,month){
@@ -1802,8 +1802,8 @@ function renderBOD(){
 
   // Thực tế
   const rDay=rows('day'), rMon=rows('month'), rQ=rows('quarter'), rY=data2026;
-  const dt_d=sumF(rDay,'tongThanhTien'), dt_m=sumF(rMon,'tongThanhTien');
-  const dt_q=sumF(rQ,'tongThanhTien'), dt_y=sumF(rY,'tongThanhTien');
+  const dt_d=sumF(rDay,'thanhTien'), dt_m=sumF(rMon,'thanhTien');
+  const dt_q=sumF(rQ,'thanhTien'), dt_y=sumF(rY,'thanhTien');
   const ln_d=sumF(rDay,'lnThuc'), ln_m=sumF(rMon,'lnThuc');
   const ln_q=sumF(rQ,'lnThuc'), ln_y=sumF(rY,'lnThuc');
 
@@ -1885,7 +1885,7 @@ function renderBOD(){
     const d=new Date(r.ngay);if(isNaN(d))return;
     const k=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     if(!dayMap[k])dayMap[k]={dt:0,ln:0,sl:0};
-    dayMap[k].dt+=r.tongThanhTien||0;
+    dayMap[k].dt+=(r.thanhTien||0);
     dayMap[k].ln+=(r.lnThuc||0);
     dayMap[k].sl+=r.sl||0;
   });
@@ -1935,7 +1935,7 @@ function renderBODGroup(period, tabEl){
   rows.forEach(r=>{
     const g=r.loaiHang||'Khác';
     if(!map[g]) map[g]={dt:0,ln:0};
-    map[g].dt+=(r.tongThanhTien||0);
+    map[g].dt+=(r.thanhTien||0);
     map[g].ln+=(r.lnThuc||0);
   });
 
@@ -1995,7 +1995,7 @@ function copyBOD(){
   }
   function sumF(arr,f){return arr.reduce((s,r)=>s+(r[f]||0),0);}
   const rDay=rows('day'),rMon=rows('month'),rY=data2026;
-  const dt_d=sumF(rDay,'tongThanhTien'),dt_m=sumF(rMon,'tongThanhTien'),dt_y=sumF(rY,'tongThanhTien');
+  const dt_d=sumF(rDay,'thanhTien'),dt_m=sumF(rMon,'thanhTien'),dt_y=sumF(rY,'thanhTien');
   const ln_d=sumF(rDay,'lnThuc'),ln_m=sumF(rMon,'lnThuc');
   const tsln_d=dt_d>0?ln_d/dt_d:0, tsln_m=dt_m>0?ln_m/dt_m:0;
   const dt_kh_m=pN(document.getElementById('dt_kh_'+lastMonth)?.value);
@@ -2218,7 +2218,7 @@ function recalcKPI(){
   // ── Thực tế DT BH từ data ──────────────────────────────────
   var DT_ACT={};
   for(var m=1;m<=12;m++){
-    DT_ACT[m]=D_ALL.filter(r=>r.nam===2026&&r.thang===m).reduce((s,r)=>s+(r.tongThanhTien||0),0);
+    DT_ACT[m]=D_ALL.filter(r=>r.nam===2026&&r.thang===m).reduce((s,r)=>s+(r.thanhTien||0),0);
   }
   // TSLN thực tế: trước GG = tongLoiNhuan/thanhTien, sau GG = tongLoiNhuan/tongThanhTien
   var TSLN_ACT={}, TSLN_SAU={};
@@ -2226,10 +2226,10 @@ function recalcKPI(){
     var rows=D_ALL.filter(r=>r.nam===2026&&r.thang===m);
     var dt_truoc=rows.reduce((s,r)=>s+(r.thanhTien||0),0);
     var dt_sau=rows.reduce((s,r)=>s+(r.tongThanhTien||0),0);
-    var ln=rows.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);  // tongLoiNhuan cho TSLN trước GG
-    var lnS=rows.reduce((s,r)=>s+(r.lnThuc||0),0);       // lnThuc cho TSLN sau GG
-    TSLN_ACT[m]=dt_truoc>0?ln/dt_truoc:0;  // trước GG
-    TSLN_SAU[m]=dt_sau>0?lnS/dt_sau:0;      // sau GG
+    var ln=rows.reduce((s,r)=>s+(r.lnThuc||0),0);        // lnThuc=thanhTien-giaVon cho TSLN chính
+    var lnSau=rows.reduce((s,r)=>s+(r.tongLoiNhuan||0),0); // tongLoiNhuan=tongThanhTien-giaVon cho sau GG
+    TSLN_ACT[m]=dt_truoc>0?ln/dt_truoc:0;  // lnThuc/thanhTien = TSLN trên DT
+    TSLN_SAU[m]=dt_sau>0?lnSau/dt_sau:0;    // tongLoiNhuan/tongThanhTien = sau GG
   }
 
   function gV(id){const el=document.getElementById(id);return el&&el.value?pN(el.value):null;}
@@ -2327,7 +2327,7 @@ function recalcKPI(){
   // TSLN TT tổng (cả năm, trước GG)
   var rows_all=D_ALL.filter(r=>r.nam===2026);
   var dt_truoc_all=rows_all.reduce((s,r)=>s+(r.thanhTien||0),0);
-  var ln_all=rows_all.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);  // trước GG cho TSLN
+  var ln_all=rows_all.reduce((s,r)=>s+(r.lnThuc||0),0);  // lnThuc cho TSLN tổng
   var tsln_tt_all=dt_truoc_all>0?ln_all/dt_truoc_all:0;
   if(eTot('tsln_tt_total'))eTot('tsln_tt_total').innerHTML=(tsln_tt_all*100).toFixed(2)+'%';
   if(eTot('tsln_kpi_total')&&tsln_kh_cnt>0)eTot('tsln_kpi_total').innerHTML=pctBadge2(tsln_tt_all*100,tsln_kh_sum/tsln_kh_cnt);
@@ -2351,7 +2351,7 @@ function recalcKPI(){
     const tsln_kh_avg=tsln_kh_vs.length?tsln_kh_vs.reduce((s,v)=>s+v,0)/tsln_kh_vs.length:null;
     const rows_m=D_ALL.filter(r=>r.nam===2026&&months.includes(r.thang));
     const dt_tr_m=rows_m.reduce((s,r)=>s+(r.thanhTien||0),0);
-    const ln_m=rows_m.reduce((s,r)=>s+(r.tongLoiNhuan||0),0);  // trước GG cho TSLN
+    const ln_m=rows_m.reduce((s,r)=>s+(r.lnThuc||0),0);  // lnThuc cho TSLN
     const tsln_tt_avg=dt_tr_m>0?ln_m/dt_tr_m*100:0;
     const cn_kh_s=months.reduce((s,m)=>{const v=gV('cn_kh_'+m);return s+(v||0);},0);
     const cn_tt_s=months.reduce((s,m)=>s+(_kpiCache['cn_tt_raw_'+m]!==undefined?_kpiCache['cn_tt_raw_'+m]:(gV('cn_tt_'+m)||0)),0);
