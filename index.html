@@ -2133,6 +2133,8 @@ function applySheetKPI(rows){
     setSheetField('cn_kh_'+m, R_CN_KH[ci]);
   }
   console.log('[Sheet] ht_kh T1=',R_HT_KH[2],' tl_kh T1=',R_TL_KH[2],' cn_kh T1=',R_CN_KH[2]);
+  // Tính dt_kh / ln_kh vào cache để BOD đọc được
+  if(typeof recalcKPI==='function') recalcKPI();
 }
 
 function setSheetField(id, rawVal){
