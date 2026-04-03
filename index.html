@@ -1970,9 +1970,9 @@ function renderBOD(){
     return `<div class="bod-cell"><div class="bod-cell-label">${label}</div><div class="bod-cell-val">${fv}</div>${targetHtml}${pctHtml}${progHtml}</div>`;
   }
   document.getElementById('bodCNGrid').innerHTML =
-    cellCN(`Tổng thu CN T${lastMonth}`, cn_tong_m, cn_kh_m, 'Chưa có KH') +
-    cellCN('Tổng thu CN Lũy kế năm', cn_tong_y, cn_kh_y&&cn_kh_y>0?cn_kh_y:null, 'Chưa có KH') +
-    cellCN(`CN Cũ đã thu T${lastMonth}`, cn_cu_m, null, 'Từ cột J:K sheet') +
+    cellCN(`Tổng thu CN T${lastMonth}`, cn_tong_m, null, 'Từ cột F:G sheet') +
+    cellCN('Tổng thu CN Lũy kế năm', cn_tong_y, null, 'Từ cột F:G sheet') +
+    cellCN(`CN Cũ đã thu T${lastMonth}`, cn_cu_m, cn_kh_m, 'Chưa có KH') +
     cellCN(`CN Bán hàng T${lastMonth}`, cn_bh_m, null, 'Tổng − CN Cũ');
 
   // Bảng 7 ngày gần nhất
@@ -2103,7 +2103,7 @@ function copyBOD(){
   const cn_kh_copy_el = document.getElementById('cn_kh_'+lastMonth);
   const cn_kh_copy = cn_kh_copy_el&&cn_kh_copy_el.value ? pN(cn_kh_copy_el.value) : null;
   const cnLine = cn_tong_copy>0
-    ? `\n💳 THU HỒI CÔNG NỢ T${lastMonth}\n• Tổng CN: ${fmtB(cn_tong_copy)}${cn_kh_copy?' (KH: '+fmtB(cn_kh_copy)+')':''}\n• CN Cũ đã thu: ${fmtB(cn_cu_copy)}  |  CN BH: ${fmtB(cn_bh_copy)}`
+    ? `\n💳 THU HỒI CÔNG NỢ T${lastMonth}\n• Tổng CN: ${fmtB(cn_tong_copy)}\n• CN Cũ đã thu: ${fmtB(cn_cu_copy)}${cn_kh_copy?' (KH: '+fmtB(cn_kh_copy)+')':''}  |  CN BH: ${fmtB(cn_bh_copy)}`
     : '';
   const text=`📊 BÁO CÁO PHÚC TEA – ${String(lastDay).padStart(2,'0')}/${String(lastMonth).padStart(2,'0')}/${lastYear}
 ━━━━━━━━━━━━━━━━━━━━
@@ -2402,12 +2402,12 @@ function recalcKPI(){
   }
 
   // ── SECTION 2: Thu hồi Công nợ ─────────────────────────────
+  // KH so sánh với CN Cũ đã thu (J:K = _cnKPI), không phải Tổng
   let cn_kh_sum=0,cn_tt_sum=0,cn_kh_cnt=0,cn_tt_cnt=0;
   for(var m=1;m<=12;m++){
     const kh=pN(document.getElementById('cn_kh_'+m)&&document.getElementById('cn_kh_'+m).value);
-    // Dùng raw cache (cn_tt được fmt VN → pN() sẽ đọc sai); fallback sang pN nếu nhập tay
-    const tt=_kpiCache['cn_tt_raw_'+m]!==undefined ? _kpiCache['cn_tt_raw_'+m]
-            : pN(document.getElementById('cn_tt_'+m)&&document.getElementById('cn_tt_'+m).value);
+    // tt = CN Cũ đã thu (J:K)
+    const tt=_cnKPI['2026-'+m]||null;
     const pe=document.getElementById('cn_pct_'+m);
     if(pe)pe.innerHTML=pctBadge(tt,kh);
     if(kh!==null){cn_kh_sum+=kh;cn_kh_cnt++;}
