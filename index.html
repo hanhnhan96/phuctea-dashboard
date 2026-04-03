@@ -473,6 +473,13 @@ tr:last-child td{border-bottom:none}
     <div class="bod-grid" id="bodHTGrid"></div>
   </div>
 
+  <!-- THU HỒI CÔNG NỢ -->
+  <div class="bod-section">
+    <div class="bod-section-title">💳 Thu hồi Công nợ <span id="bodCNsub"></span></div>
+    <div class="bod-row-header">Thực tế | Mục tiêu | % Đạt</div>
+    <div class="bod-grid" id="bodCNGrid"></div>
+  </div>
+
   <!-- CHI TIẾT NGÀY -->
   <div class="bod-section">
     <div class="bod-section-title">📅 Chi tiết theo ngày (7 ngày gần nhất) <span></span></div>
@@ -1929,6 +1936,45 @@ function renderBOD(){
     `<div class="bod-cell"><div class="bod-cell-label">DT HT T${lastMonth}</div><div class="bod-cell-val">${ht_tt_m?fmtB(ht_tt_m):'–'}</div><div class="bod-cell-target">Nhập trong tab KPI</div></div>` +
     `<div class="bod-cell"><div class="bod-cell-label">DT thực tế T${lastMonth}</div><div class="bod-cell-val">${fmtB(dt_m)}</div><div class="bod-cell-target">Từ dữ liệu bán hàng</div></div>`;
 
+  // Thu hồi Công nợ
+  document.getElementById('bodCNsub').textContent=`Dữ liệu đến ${lastDateStr}`;
+  // Tổng thu CN (KPI sheet) theo tháng
+  const cn_tt_m = _kpiCache['cn_tt_raw_'+lastMonth]||0;
+  const cn_tt_y = Array.from({length:12},(_,i)=>_kpiCache['cn_tt_raw_'+(i+1)]||0).reduce((s,v)=>s+v,0);
+  // CN BH (bán hàng) theo tháng/năm
+  const cn_bh_m = _cnBH['2026-'+lastMonth]||0;
+  const cn_bh_y = Array.from({length:12},(_,i)=>_cnBH['2026-'+(i+1)]||0).reduce((s,v)=>s+v,0);
+  // CN cũ = tổng - CN BH
+  const cn_cu_m = Math.max(0, cn_tt_m - cn_bh_m);
+  const cn_cu_y = Math.max(0, cn_tt_y - cn_bh_y);
+  // KH thu CN tháng (từ DOM input cn_kh)
+  const cn_kh_el = document.getElementById('cn_kh_'+lastMonth);
+  const cn_kh_m = cn_kh_el&&cn_kh_el.value ? pN(cn_kh_el.value) : null;
+  const cn_kh_y = Array.from({length:12},(_,i)=>{
+    const e=document.getElementById('cn_kh_'+(i+1)); return e&&e.value?pN(e.value)||0:0;
+  }).reduce((s,v)=>s+v,0)||null;
+
+  function cellCN(label, tt, kh, sub){
+    const fv = tt>0 ? fmtB(tt) : '–';
+    let targetHtml='',pctHtml='',progHtml='';
+    if(kh!=null&&kh>0){
+      const ach=tt/kh, ap=(ach*100).toFixed(1)+'%';
+      const col=ach>=1?'#2d9e5f':ach>=0.7?'#d69e2e':'#e53e3e';
+      const bw=Math.min(100,ach*100).toFixed(0);
+      targetHtml=`<div class="bod-cell-target">KH: ${fmtB(kh)}</div>`;
+      pctHtml=`<div class="bod-cell-pct" style="color:${col}">Đạt ${ap}</div>`;
+      progHtml=`<div class="bod-progress"><div class="bod-progress-bar" style="width:${bw}%;background:${col}"></div></div>`;
+    } else if(sub){
+      targetHtml=`<div class="bod-cell-target">${sub}</div>`;
+    }
+    return `<div class="bod-cell"><div class="bod-cell-label">${label}</div><div class="bod-cell-val">${fv}</div>${targetHtml}${pctHtml}${progHtml}</div>`;
+  }
+  document.getElementById('bodCNGrid').innerHTML =
+    cellCN(`Tổng CN T${lastMonth}`, cn_tt_m, cn_kh_m, 'Chưa có KH') +
+    cellCN('Tổng CN Lũy kế năm', cn_tt_y, cn_kh_y&&cn_kh_y>0?cn_kh_y:null, 'Chưa có KH') +
+    cellCN(`CN Bán hàng T${lastMonth}`, cn_bh_m, null, 'Thu CN phát sinh từ BH') +
+    cellCN(`CN Cũ T${lastMonth}`, cn_cu_m, null, 'Tổng CN − CN Bán hàng');
+
   // Bảng 7 ngày gần nhất
   const dayMap={};
   data2026.forEach(r=>{
@@ -2051,6 +2097,14 @@ function copyBOD(){
   const dt_kh_m=pN(document.getElementById('dt_kh_'+lastMonth)?.value);
   const ach_m=dt_kh_m?`(${(dt_m/dt_kh_m*100).toFixed(1)}% KH)`:'';
 
+  const cn_tt_copy = _kpiCache['cn_tt_raw_'+lastMonth]||0;
+  const cn_bh_copy = _cnBH['2026-'+lastMonth]||0;
+  const cn_cu_copy = Math.max(0, cn_tt_copy - cn_bh_copy);
+  const cn_kh_copy_el = document.getElementById('cn_kh_'+lastMonth);
+  const cn_kh_copy = cn_kh_copy_el&&cn_kh_copy_el.value ? pN(cn_kh_copy_el.value) : null;
+  const cnLine = cn_tt_copy>0
+    ? `\n💳 THU HỒI CÔNG NỢ T${lastMonth}\n• Tổng CN: ${fmtB(cn_tt_copy)}${cn_kh_copy?' (KH: '+fmtB(cn_kh_copy)+')'  :''}\n• CN Bán hàng: ${fmtB(cn_bh_copy)}  |  CN Cũ: ${fmtB(cn_cu_copy)}`
+    : '';
   const text=`📊 BÁO CÁO PHÚC TEA – ${String(lastDay).padStart(2,'0')}/${String(lastMonth).padStart(2,'0')}/${lastYear}
 ━━━━━━━━━━━━━━━━━━━━
 📅 TRONG NGÀY
@@ -2063,7 +2117,7 @@ function copyBOD(){
 
 💼 LŨY KẾ NĂM 2026
 • Doanh thu: ${fmtB(dt_y)}
-• Lợi nhuận: ${fmtB(sumF(rY,'tongLoiNhuan'))}  |  TSLN: ${pct(sumF(rY,'tongLoiNhuan')/dt_y||0)}
+• Lợi nhuận: ${fmtB(sumF(rY,'lnThuc'))}  |  TSLN: ${pct(dt_y>0?sumF(rY,'lnThuc')/dt_y:0)}${cnLine}
 ━━━━━━━━━━━━━━━━━━━━
 📌 ${info}`;
 
