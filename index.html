@@ -1106,13 +1106,13 @@ function applyCNToKPI(){
   });
   let totBH=0,totDT=0;
   for(let m=1;m<=12;m++){
-    // F:G = Tổng thu CN → cn_tt_m (thực tế thu CN tổng)
-    const kv=_cnBH['2026-'+m]||0;
+    // J:K = CN Cũ đã thu → cn_tt_m (Thực tế so với KH)
+    const kv=_cnKPI['2026-'+m]||0;
     const cnEl=document.getElementById('cn_tt_'+m);
     if(cnEl&&kv){cnEl.value=fmt(kv);cnEl.classList.add('kpi-sheet-field');cnEl.readOnly=true;}
     if(kv) _kpiCache['cn_tt_raw_'+m]=kv; // raw number tránh lỗi parse VN format
-    // Tổng thu CN cũng dùng cho % CN BH / DT BH (F:G)
-    const bv=kv;
+    // F:G = Tổng thu CN → dòng Thu CN BH / % CN BH/DT BH
+    const bv=_cnBH['2026-'+m]||0;
     const dt=dtByM[m]||0;
     totBH+=bv; totDT+=dt;
     const bhEl=document.getElementById('cnbh_tt_'+m);
