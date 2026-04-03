@@ -276,13 +276,37 @@ tr:last-child td{border-bottom:none}
 <!-- SO SÁNH THÁNG -->
 <div class="page" id="page-cmp">
   <p class="stitle">So sánh theo Tháng</p>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:11px;font-weight:700;color:#3182ce">● Kỳ 1</span>
+      <div style="display:flex;gap:4px">
+        <select id="cmpM1" class="filter-sel" style="width:64px"></select>
+        <select id="cmpY1" class="filter-sel" style="width:72px"></select>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:11px;font-weight:700;color:#38a169">● Kỳ 2</span>
+      <div style="display:flex;gap:4px">
+        <select id="cmpM2" class="filter-sel" style="width:64px"></select>
+        <select id="cmpY2" class="filter-sel" style="width:72px"></select>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:11px;font-weight:700;color:#f0a500">● Kỳ 3 (tùy chọn)</span>
+      <div style="display:flex;gap:4px">
+        <select id="cmpM3" class="filter-sel" style="width:64px"></select>
+        <select id="cmpY3" class="filter-sel" style="width:72px"></select>
+      </div>
+    </div>
+    <button class="save-btn" onclick="renderCmpPage()" style="height:32px;align-self:flex-end">🔍 So sánh</button>
+  </div>
   <div class="cgrid" id="cmpCards"></div>
   <div class="cc" style="margin-bottom:16px">
-    <div class="ch"><div class="ctitle">Biểu đồ so sánh Tháng 1 / Tháng 2 / Tháng 3</div></div>
+    <div class="ch"><div class="ctitle" id="cmpChTitle">Biểu đồ so sánh</div></div>
     <div style="position:relative;height:300px"><canvas id="cCmpDetail"></canvas></div>
   </div>
   <div class="cc">
-    <div class="ch"><div><div class="ctitle">Tăng trưởng MoM (Month-over-Month)</div><div class="csub">% thay đổi so với tháng trước</div></div></div>
+    <div class="ch"><div><div class="ctitle">% Thay đổi so với kỳ trước</div><div class="csub">Tính theo kỳ liên tiếp đã chọn</div></div></div>
     <div style="position:relative;height:230px"><canvas id="cMoM"></canvas></div>
   </div>
 </div>
@@ -1229,30 +1253,56 @@ function renderMComp(){
 }
 
 // ===== TAB SO SÁNH THÁNG =====
+function initCmpFilter(){
+  const MNs=['','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
+  const years=[...new Set(D_ALL.map(r=>r.nam).filter(y=>y&&!isNaN(y)))].sort((a,b)=>a-b);
+  function buildSel(mId,yId){
+    const mEl=document.getElementById(mId),yEl=document.getElementById(yId);
+    if(!mEl||!yEl)return;
+    mEl.innerHTML=Array.from({length:12},(_,i)=>`<option value="${i+1}">${MNs[i+1]}</option>`).join('');
+    yEl.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
+  }
+  buildSel('cmpM1','cmpY1');buildSel('cmpM2','cmpY2');buildSel('cmpM3','cmpY3');
+  // Default: 3 tháng cuối có dữ liệu
+  const ymCombos=[...new Set(D_ALL.filter(r=>r.nam&&r.thang).map(r=>r.nam*100+r.thang))].sort((a,b)=>a-b);
+  const last3=ymCombos.slice(-3).map(v=>({y:Math.floor(v/100),m:v%100}));
+  while(last3.length<3){const p=last3[0]||{y:years[years.length-1]||2026,m:3};last3.unshift(p.m>1?{y:p.y,m:p.m-1}:{y:p.y-1,m:12});}
+  [['cmpM1','cmpY1'],['cmpM2','cmpY2'],['cmpM3','cmpY3']].forEach(([mId,yId],i)=>{
+    const s=last3[i];
+    const mEl=document.getElementById(mId),yEl=document.getElementById(yId);
+    if(mEl)mEl.value=s.m;
+    if(yEl)yEl.value=s.y;
+  });
+}
+
 function renderCmpPage(){
-  // Lấy danh sách tháng có dữ liệu trong D_CY, sắp xếp, lấy tối đa 3 tháng cuối
-  const availMs=[...new Set(D_CY.map(r=>r.thang).filter(m=>m&&!isNaN(m)))].sort((a,b)=>a-b);
-  const ms=availMs.length>=3?availMs.slice(-3):availMs.length>0?availMs:[1,2,3];
+  // Khởi tạo filter nếu chưa có options
+  if(!document.getElementById('cmpM1')?.options.length) initCmpFilter();
+  function getSlot(mId,yId){
+    const m=+document.getElementById(mId)?.value||0, y=+document.getElementById(yId)?.value||0;
+    return(m&&y)?{m,y}:null;
+  }
+  const slots=[getSlot('cmpM1','cmpY1'),getSlot('cmpM2','cmpY2'),getSlot('cmpM3','cmpY3')].filter(Boolean);
+  if(!slots.length)return;
   const cols=['#3182ce','#38a169','#f0a500'];
-  const yearLabel=(()=>{const ys=[...new Set(D_CY.map(r=>r.nam).filter(Boolean))];return ys.length===1?String(ys[0]):'';})();
-  // Cập nhật tiêu đề biểu đồ
-  const cmpChTitle=document.querySelector('#page-cmp .ctitle');
-  if(cmpChTitle)cmpChTitle.textContent=`Biểu đồ so sánh ${ms.map(m=>MN[m]).join(' / ')}${yearLabel?' – '+yearLabel:''}`;
-  const mD=ms.map(m=>{
-    const rows=D_CY.filter(r=>r.thang===m);
+  const mD=slots.map(({y,m})=>{
+    const rows=D_ALL.filter(r=>r.nam===y&&r.thang===m);
     const dt=rows.reduce((s,r)=>s+(r.thanhTien||0),0);
     const ln=rows.reduce((s,r)=>s+(r.lnThuc||0),0);
     const sl=rows.reduce((s,r)=>s+r.sl,0);
     const gg=rows.reduce((s,r)=>s+(r.tongGiamGia||0),0);
     const gv=rows.reduce((s,r)=>s+(r.tongGiaVon||0),0);
     const ch=new Set(rows.map(r=>r.chiNhanh)).size;
-    return{dt,ln,sl,gg,gv,ch,mg:dt>0?ln/dt:0};
+    return{y,m,dt,ln,sl,gg,gv,ch,mg:dt>0?ln/dt:0};
   });
+  const labels=mD.map(d=>`T${d.m}/${d.y}`);
+  const titleEl=document.getElementById('cmpChTitle');
+  if(titleEl)titleEl.textContent=`Biểu đồ so sánh ${labels.join(' / ')}`;
   let h='';
-  ms.forEach((m,i)=>{
-    const d=mD[i],prev=i>0?mD[i-1]:null;
+  mD.forEach((d,i)=>{
+    const prev=i>0?mD[i-1]:null;
     h+=`<div class="mc" style="border-color:${cols[i%3]}">
-      <h3 style="color:${cols[i%3]}">${MN[m]}${yearLabel?' '+yearLabel:''}</h3>
+      <h3 style="color:${cols[i%3]}">T${d.m}/${d.y}</h3>
       <div class="mr"><span class="mn">Doanh Thu</span><span class="mv">${fmtB(d.dt)}</span></div>
       <div class="mr"><span class="mn">Lợi Nhuận</span><span class="mv">${fmtB(d.ln)}</span></div>
       <div class="mr"><span class="mn">Biên LN</span><span class="mv" style="color:${d.mg>=.3?'#2d9e5f':d.mg>=.2?'#d69e2e':'#e53e3e'}">${pct(d.mg)}</span></div>
@@ -1260,14 +1310,14 @@ function renderCmpPage(){
       <div class="mr"><span class="mn">Giảm Giá</span><span class="mv">${fmtB(d.gg)}</span></div>
       <div class="mr"><span class="mn">Giá Vốn</span><span class="mv">${fmtB(d.gv)}</span></div>
       <div class="mr"><span class="mn">Cửa Hàng HĐ</span><span class="mv">${d.ch} cửa hàng</span></div>
-      ${prev?`<div class="mr"><span class="mn">Tăng trưởng DT</span><span class="mv">${arrow(d.dt,prev.dt)} so với T${m-1}</span></div>`:''}
+      ${prev?`<div class="mr"><span class="mn">% Thay đổi DT</span><span class="mv">${arrow(d.dt,prev.dt)} so với T${prev.m}/${prev.y}</span></div>`:''}
     </div>`;
   });
   document.getElementById('cmpCards').innerHTML=h;
   dc('cD');
   CH['cD']=new Chart(document.getElementById('cCmpDetail').getContext('2d'),{
     type:'bar',
-    data:{labels:ms.map(m=>MN[m]),datasets:[
+    data:{labels,datasets:[
       {label:'Doanh thu',data:mD.map(d=>d.dt),backgroundColor:'#1a6b3c99',borderRadius:5,borderSkipped:false},
       {label:'Lợi nhuận',data:mD.map(d=>d.ln),backgroundColor:'#3182ce99',borderRadius:5,borderSkipped:false},
       {label:'Giá vốn',data:mD.map(d=>d.gv),backgroundColor:'#e53e3e77',borderRadius:5,borderSkipped:false}
@@ -1276,14 +1326,14 @@ function renderCmpPage(){
       plugins:{legend:{position:'top'},datalabels:{anchor:'end',align:'top',font:{size:10,weight:'bold'},formatter:v=>fmtB(v),color:'#333'}},
       scales:{y:{ticks:{callback:v=>fmtB(v)},grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}}
   });
-  const mDT=[null,mD[0].dt>0?(mD[1].dt-mD[0].dt)/mD[0].dt*100:0,mD[1].dt>0?(mD[2].dt-mD[1].dt)/mD[1].dt*100:0];
-  const mLN=[null,mD[0].ln>0?(mD[1].ln-mD[0].ln)/mD[0].ln*100:0,mD[1].ln>0?(mD[2].ln-mD[1].ln)/mD[1].ln*100:0];
+  const mDT=mD.map((d,i)=>i===0?null:(mD[i-1].dt>0?(d.dt-mD[i-1].dt)/mD[i-1].dt*100:0));
+  const mLN=mD.map((d,i)=>i===0?null:(mD[i-1].ln>0?(d.ln-mD[i-1].ln)/mD[i-1].ln*100:0));
   dc('mom');
   CH['mom']=new Chart(document.getElementById('cMoM').getContext('2d'),{
     type:'bar',
-    data:{labels:ms.map(m=>MN[m]),datasets:[
-      {label:'DT MoM %',data:mDT,backgroundColor:mDT.map(v=>v===null?'#ccc':v>=0?'#1a6b3c99':'#e53e3e99'),borderRadius:5},
-      {label:'LN MoM %',data:mLN,backgroundColor:mLN.map(v=>v===null?'#ccc':v>=0?'#3182ce99':'#f6ad5599'),borderRadius:5}
+    data:{labels,datasets:[
+      {label:'DT %',data:mDT,backgroundColor:mDT.map(v=>v===null?'#ccc':v>=0?'#1a6b3c99':'#e53e3e99'),borderRadius:5},
+      {label:'LN %',data:mLN,backgroundColor:mLN.map(v=>v===null?'#ccc':v>=0?'#3182ce99':'#f6ad5599'),borderRadius:5}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'top'},datalabels:{formatter:(v)=>v===null?'Gốc':v.toFixed(1)+'%',color:'#333',font:{size:11,weight:'bold'},anchor:'end',align:'top'}},
@@ -2392,7 +2442,7 @@ function recalcKPI(){
 
 // ===== KHỞI TẠO RENDER =====
 applyF();
-fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();});
+fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFilter();});
 </script>
 </body>
 </html>
