@@ -2161,6 +2161,7 @@ function applySheetKPI(rows){
 
   const R_HT_KH=findRow('DT Hệ thống Mục tiêu');
   const R_TL_KH=findRow('Tỷ lệ DT BH/HT Mục tiêu');
+  const R_DT_BH_KH=findRow('DT Bán hàng Mục tiêu');
   const R_HT_TT=findRow('DT Hệ thống Kết quả');
   const R_CN_KH=findKHRow();
   // Tìm row TSLN KH: sau section 'Tỷ suất lợi nhuận' là row 'Kế hoạch'
@@ -2181,13 +2182,18 @@ function applySheetKPI(rows){
     setSheetField('tl_kh_'+m, R_TL_KH[ci]);
     setSheetField('ht_tt_'+m, R_HT_TT[ci]);
     setSheetField('cn_kh_'+m, R_CN_KH[ci]);
+    // Cache DT BH KH trực tiếp từ sheet (row "DT Bán hàng Mục tiêu")
+    if(R_DT_BH_KH[ci]!==undefined){
+      const v=parseViNum(R_DT_BH_KH[ci]);
+      if(v!==null) _kpiCache['dt_bh_kh_'+m]=v;
+    }
     // Cache TSLN KH vào _kpiCache (lưu dạng % số, vd 27 cho 27%)
     if(R_TSLN_KH[ci]!==undefined){
       const v=parseSalesNum(R_TSLN_KH[ci]);
       if(!isNaN(v))_kpiCache['tsln_kh_'+m]=v*100; // parseSalesNum ÷100 → nhân lại
     }
   }
-  console.log('[Sheet] ht_kh T1=',R_HT_KH[2],' tl_kh T1=',R_TL_KH[2],' cn_kh T1=',R_CN_KH[2]);
+  console.log('[Sheet] ht_kh T1=',R_HT_KH[2],' tl_kh T1=',R_TL_KH[2],' dt_bh_kh T1=',R_DT_BH_KH[2],' cn_kh T1=',R_CN_KH[2]);
   // Tính dt_kh / ln_kh vào cache để BOD đọc được
   if(typeof recalcKPI==='function') recalcKPI();
 }
@@ -2252,8 +2258,9 @@ function recalcKPI(){
     var ht_tt = gV('ht_tt_'+m);  // DT HT kết quả
     var dt_tt = DT_ACT[m];        // DT BH kết quả (auto)
 
-    // DT BH mục tiêu = HT KH × Tỷ lệ KH / 100
-    var dt_kh = (ht_kh!==null&&tl_kh!==null) ? ht_kh*tl_kh/100 : null;
+    // DT BH mục tiêu: ưu tiên giá trị trực tiếp từ sheet, fallback tính từ HT KH × Tỷ lệ KH / 100
+    var dt_kh = (_kpiCache['dt_bh_kh_'+m]!==undefined) ? _kpiCache['dt_bh_kh_'+m] :
+                (ht_kh!==null&&tl_kh!==null) ? ht_kh*tl_kh/100 : null;
     _kpiCache['dt_kh_'+m]=dt_kh;  // để renderBOD đọc
     // Tỷ lệ TT = DT BH TT / DT HT TT
     var tl_tt = (ht_tt!==null&&ht_tt>0) ? dt_tt/ht_tt*100 : null;
@@ -2336,6 +2343,7 @@ function recalcKPI(){
   const now=new Date(), curM=now.getMonth()+1;
   const dataMs=[...new Set(D_ALL.filter(r=>r.nam===2026).map(r=>r.thang))].sort();
   const lastM=dataMs.length?dataMs[dataMs.length-1]:3;
+  const lastYear=2026;
   const qMs=lastM<=3?[1,2,3]:lastM<=6?[4,5,6]:lastM<=9?[7,8,9]:[10,11,12];
   const allMs=Array.from({length:12},(_,i)=>i+1);
 
