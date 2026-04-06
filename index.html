@@ -599,6 +599,19 @@ tr:last-child td{border-bottom:none}
     <button class="btn btn2" onclick="ordReset()">Đặt lại</button>
   </div>
   <div id="ordAlerts" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+
+  <!-- Bảng KPI đánh giá -->
+  <div class="cc" style="margin-bottom:16px">
+    <div class="ch">
+      <div>
+        <div class="ctitle">📊 Đánh giá KPI Giao hàng</div>
+        <div class="csub">Mục tiêu: 100% đơn giao trước 8 ngày · Lọc theo bộ lọc bên trên</div>
+      </div>
+      <div id="ordKpiScore" style="font-size:22px;font-weight:800"></div>
+    </div>
+    <div id="ordKpiTable"></div>
+  </div>
+
   <div class="tbl-wrap">
     <table>
       <thead><tr>
@@ -2447,12 +2460,11 @@ function defaultToCurrentMonth(){
 // ===== THEO DÕI ĐƠN HÀNG =====
 // Phân loại loaiHang → 3 nhóm đơn
 function getOrdType(lh){
-  if(!lh) return null;
+  if(!lh) return 'ht';
   const u=lh.toUpperCase().trim();
   if(u.includes('NGUYÊN LIỆU')||u.includes('NL ĐỘC QUYỀN')||u==='NL'||u==='NL ĐQ'||u.startsWith('NL ')) return 'nl';
   if(u.includes('VẬT LIỆU')||u.includes('VL ĐỘC QUYỀN')||u==='VL'||u==='VL ĐQ'||u.startsWith('VL ')) return 'vl';
-  if(u.includes('HỆ THỐNG')||u==='HT'||u.startsWith('HT ')) return 'ht';
-  return null; // không thuộc 3 nhóm → bỏ qua
+  return 'ht'; // tất cả danh mục còn lại → Hệ Thống
 }
 const ORD_TYPE_LABEL={
   nl:{label:'Nguyên liệu & NL ĐQ', bg:'#e8f5ee', cl:'#1a6b3c'},
@@ -2479,7 +2491,6 @@ function renderOrderTrack(){
     if(from&&ng<from) return;
     if(to&&ng>to) return;
     const ot=getOrdType(r.loaiHang);
-    if(!ot) return; // bỏ qua danh mục không thuộc 3 nhóm
     const k=r.chiNhanh+'__'+ng+'__'+ot;
     if(!map[k]) map[k]={chiNhanh:r.chiNhanh,brand:r.brand,ngay:ng,ordType:ot,ngayGui:'',tongDT:0,soSP:0};
     const o=map[k];
@@ -2540,6 +2551,83 @@ function renderOrderTrack(){
     });
   }
   document.getElementById('ordTbody').innerHTML=tb;
+
+  // ===== BẢNG KPI ĐÁNH GIÁ =====
+  // Mỗi đơn: đúng hạn nếu (ngayGui - ngay) <= 8 ngày, hoặc chưa gửi mà daysWait <= 8 (còn trong hạn)
+  const KPI_DAY=8;
+  const kpiRows=typeF?orders.filter(o=>o.ordType===typeF):orders;
+  // Thống kê theo loại đơn
+  const kpiStat={
+    nl:{label:'Nguyên liệu & NL ĐQ',bg:'#e8f5ee',cl:'#1a6b3c',total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0},
+    vl:{label:'Vật liệu & VL ĐQ',   bg:'#fff8e6',cl:'#7a5800',total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0},
+    ht:{label:'Hệ Thống',            bg:'#ebf8ff',cl:'#2b6cb0',total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0}
+  };
+  kpiRows.forEach(o=>{
+    const s=kpiStat[o.ordType]||kpiStat.ht;
+    s.total++;
+    if(o.ngayGui){
+      // Đã gửi — tính số ngày từ ngày đặt → ngày gửi
+      const d1=new Date(o.ngay),d2=new Date(o.ngayGui);
+      d1.setHours(0,0,0,0);d2.setHours(0,0,0,0);
+      const gap=Math.round((d2-d1)/86400000);
+      if(gap<=KPI_DAY) s.duiHan++; else s.treHan++;
+    } else {
+      // Chưa gửi
+      if(o.daysWait>KPI_DAY) s.chuaGiaoQuaHan++; else s.chuaGiao++;
+    }
+  });
+  // Tổng hợp
+  const tot={total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0};
+  Object.values(kpiStat).forEach(s=>{tot.total+=s.total;tot.duiHan+=s.duiHan;tot.treHan+=s.treHan;tot.chuaGiao+=s.chuaGiao;tot.chuaGiaoQuaHan+=s.chuaGiaoQuaHan;});
+  // % đạt = đúng hạn / (đúng hạn + trễ hạn + chưa giao quá hạn) — chưa giao còn trong hạn không tính
+  const denomAll=tot.duiHan+tot.treHan+tot.chuaGiaoQuaHan;
+  const pctAll=denomAll>0?Math.round(tot.duiHan/denomAll*100):100;
+  const scoreEl=document.getElementById('ordKpiScore');
+  if(scoreEl){
+    const cl=pctAll>=100?'#1a6b3c':pctAll>=80?'#f0a500':'#c53030';
+    scoreEl.innerHTML=`<span style="color:${cl}">${pctAll}%</span> <span style="font-size:12px;color:#aaa;font-weight:400">vs KH 100%</span>`;
+  }
+  function kpiRow(lbl,bg,cl,s){
+    const denom=s.duiHan+s.treHan+s.chuaGiaoQuaHan;
+    const p=denom>0?Math.round(s.duiHan/denom*100):100;
+    const bar=`<div style="background:#f0f0f0;border-radius:4px;height:6px;margin-top:4px"><div style="background:${p>=100?'#1a6b3c':p>=80?'#f0a500':'#c53030'};width:${Math.min(100,p)}%;height:6px;border-radius:4px"></div></div>`;
+    return`<tr>
+      <td><span style="background:${bg};color:${cl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${lbl}</span></td>
+      <td style="text-align:center">${s.total}</td>
+      <td style="text-align:center;color:#1a6b3c;font-weight:700">${s.duiHan}</td>
+      <td style="text-align:center;color:#c53030;font-weight:700">${s.treHan}</td>
+      <td style="text-align:center;color:#888">${s.chuaGiao}</td>
+      <td style="text-align:center;color:#c53030">${s.chuaGiaoQuaHan}</td>
+      <td style="min-width:100px"><div style="font-weight:800;color:${p>=100?'#1a6b3c':p>=80?'#f0a500':'#c53030'}">${denom?p+'%':'–'}</div>${bar}</td>
+    </tr>`;
+  }
+  const kpiTbl=document.getElementById('ordKpiTable');
+  if(kpiTbl){
+    let kh=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
+      <thead><tr style="background:#f8fafc">
+        <th style="padding:8px 10px;text-align:left;font-weight:700">Loại đơn</th>
+        <th style="padding:8px 10px;text-align:center;font-weight:700">Tổng đơn</th>
+        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#1a6b3c">✅ Đúng hạn (≤${KPI_DAY}N)</th>
+        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#c53030">❌ Trễ hạn</th>
+        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#888">⏳ Chưa giao (còn hạn)</th>
+        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#c53030">⚠️ Chưa giao (quá hạn)</th>
+        <th style="padding:8px 10px;text-align:left;font-weight:700">% Đạt KPI</th>
+      </tr></thead><tbody>`;
+    ['nl','vl','ht'].forEach(t=>{const s=kpiStat[t];kh+=kpiRow(s.label,s.bg,s.cl,s);});
+    // Dòng tổng
+    const dp=denomAll>0?Math.round(tot.duiHan/denomAll*100):100;
+    const barT=`<div style="background:#f0f0f0;border-radius:4px;height:6px;margin-top:4px"><div style="background:${dp>=100?'#1a6b3c':dp>=80?'#f0a500':'#c53030'};width:${Math.min(100,dp)}%;height:6px;border-radius:4px"></div></div>`;
+    kh+=`<tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
+      <td style="padding:8px 10px">Tổng cộng</td>
+      <td style="padding:8px 10px;text-align:center">${tot.total}</td>
+      <td style="padding:8px 10px;text-align:center;color:#1a6b3c">${tot.duiHan}</td>
+      <td style="padding:8px 10px;text-align:center;color:#c53030">${tot.treHan}</td>
+      <td style="padding:8px 10px;text-align:center;color:#888">${tot.chuaGiao}</td>
+      <td style="padding:8px 10px;text-align:center;color:#c53030">${tot.chuaGiaoQuaHan}</td>
+      <td style="padding:8px 10px;min-width:100px"><div style="font-size:16px;font-weight:800;color:${dp>=100?'#1a6b3c':dp>=80?'#f0a500':'#c53030'}">${denomAll?dp+'%':'–'}</div>${barT}</td>
+    </tr>`;
+    kpiTbl.innerHTML=kh+'</tbody></table>';
+  }
 }
 
 function setWeekThis(){
