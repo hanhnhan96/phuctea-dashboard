@@ -605,7 +605,7 @@ tr:last-child td{border-bottom:none}
     <div class="ch">
       <div>
         <div class="ctitle">📊 Đánh giá KPI Giao hàng</div>
-        <div class="csub">Mục tiêu: 100% đơn giao trước 8 ngày · Lọc theo bộ lọc bên trên</div>
+        <div class="csub">Mục tiêu: 100% đơn giao trong vòng 7 ngày · Lọc theo bộ lọc bên trên</div>
       </div>
       <div id="ordKpiScore" style="font-size:22px;font-weight:800"></div>
     </div>
@@ -2502,7 +2502,7 @@ function renderOrderTrack(){
   const orders=Object.values(map).map(o=>{
     const d=new Date(o.ngay);d.setHours(0,0,0,0);
     o.daysWait=Math.max(0,Math.floor((today-d)/86400000));
-    o.code=o.ngayGui?'sent':o.daysWait>7?'urgent':o.daysWait>5?'warn':'ok';
+    o.code=o.ngayGui?'sent':o.daysWait>=7?'urgent':o.daysWait>=5?'warn':'ok';
     return o;
   });
   // Summary chips
@@ -2554,7 +2554,7 @@ function renderOrderTrack(){
 
   // ===== BẢNG KPI ĐÁNH GIÁ =====
   // Mỗi đơn: đúng hạn nếu (ngayGui - ngay) <= 8 ngày, hoặc chưa gửi mà daysWait <= 8 (còn trong hạn)
-  const KPI_DAY=8;
+  const KPI_DAY=7;
   const kpiRows=typeF?orders.filter(o=>o.ordType===typeF):orders;
   // Thống kê theo loại đơn
   const kpiStat={
