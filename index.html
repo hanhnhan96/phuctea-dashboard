@@ -222,6 +222,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('pd',this)">Sản phẩm</div>
   <div class="tab" onclick="showTab('miss',this)">📦 SP Nguyên/Vật liệu chưa nhập</div>
   <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo BOD</div>
+  <div class="tab" onclick="showTab('week',this)">📅 Báo cáo Tuần</div>
   <div class="tab" onclick="showTab('yoy',this)">📈 So sánh YoY</div>
   <div class="tab" onclick="showTab('kpi',this)">🎯 KPI Mục tiêu</div>
 </div>
@@ -536,6 +537,27 @@ tr:last-child td{border-bottom:none}
   </div>
 
 </div>
+</div>
+
+<!-- BÁO CÁO TUẦN -->
+<div class="page" id="page-week">
+  <p class="stitle">📅 Báo cáo Tuần</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px">
+    <div>
+      <div style="font-size:11px;color:#888;margin-bottom:4px">Từ ngày</div>
+      <input type="date" id="weekFrom" class="filter-sel" onchange="renderWeekReport()" style="padding:6px 10px">
+    </div>
+    <div>
+      <div style="font-size:11px;color:#888;margin-bottom:4px">Đến ngày</div>
+      <input type="date" id="weekTo" class="filter-sel" onchange="renderWeekReport()" style="padding:6px 10px">
+    </div>
+    <div style="display:flex;gap:6px">
+      <button class="ds-btn" onclick="setWeekThis()">Tuần này</button>
+      <button class="ds-btn" onclick="setWeekLast()">Tuần trước</button>
+      <button class="ds-btn" onclick="setWeek7d()">7 ngày gần đây</button>
+    </div>
+  </div>
+  <div id="weekReport"><div style="color:#aaa;padding:24px">Chọn khoảng thời gian để xem báo cáo.</div></div>
 </div>
 
 <!-- SO SÁNH YOY -->
@@ -2191,6 +2213,112 @@ function copyBOD(){
 }
 
 // ===== ĐIỀU HƯỚNG TAB =====
+function setWeekThis(){
+  const now=new Date();
+  const d=now.getDay();
+  const mon=new Date(now);mon.setDate(now.getDate()-(d===0?6:d-1));
+  const sun=new Date(mon);sun.setDate(mon.getDate()+6);
+  document.getElementById('weekFrom').value=mon.toISOString().slice(0,10);
+  document.getElementById('weekTo').value=sun.toISOString().slice(0,10);
+  renderWeekReport();
+}
+function setWeekLast(){
+  const now=new Date();
+  const d=now.getDay();
+  const thisMon=new Date(now);thisMon.setDate(now.getDate()-(d===0?6:d-1));
+  const lastMon=new Date(thisMon);lastMon.setDate(thisMon.getDate()-7);
+  const lastSun=new Date(lastMon);lastSun.setDate(lastMon.getDate()+6);
+  document.getElementById('weekFrom').value=lastMon.toISOString().slice(0,10);
+  document.getElementById('weekTo').value=lastSun.toISOString().slice(0,10);
+  renderWeekReport();
+}
+function setWeek7d(){
+  const now=new Date();
+  const d7=new Date(now);d7.setDate(now.getDate()-6);
+  document.getElementById('weekFrom').value=d7.toISOString().slice(0,10);
+  document.getElementById('weekTo').value=now.toISOString().slice(0,10);
+  renderWeekReport();
+}
+function renderWeekReport(){
+  const from=document.getElementById('weekFrom')?.value;
+  const to=document.getElementById('weekTo')?.value;
+  const el=document.getElementById('weekReport');
+  if(!from||!to||from>to){el.innerHTML='<div style="color:#aaa;padding:24px">Chọn khoảng thời gian hợp lệ.</div>';return;}
+
+  const rows=D_ALL.filter(r=>r.ngay&&r.ngay.slice(0,10)>=from&&r.ngay.slice(0,10)<=to);
+  const ptRows=rows.filter(r=>r.brand==='PHÚC TEA');
+  const thRows=rows.filter(r=>r.brand==='THE HOA');
+
+  // CN months overlapping with range
+  const d1=new Date(from),d2=new Date(to);
+  const cnMonths=[];
+  let cy=d1.getFullYear(),cm=d1.getMonth()+1;
+  const ey=d2.getFullYear(),em=d2.getMonth()+1;
+  while(cy<ey||(cy===ey&&cm<=em)){cnMonths.push(cy+'-'+cm);cm++;if(cm>12){cm=1;cy++;}}
+  const cnTongAll=cnMonths.reduce((s,k)=>s+(_cnBH[k]||0),0);
+  const cnCuAll=cnMonths.reduce((s,k)=>s+(_cnKPI[k]||0),0);
+  const cnLabel=cnMonths.map(k=>{const p=k.split('-');return'T'+p[1]+'/'+p[0];}).join(', ');
+
+  function calc(arr){
+    const dt=arr.reduce((s,r)=>s+(r.thanhTien||0),0);
+    const gv=arr.reduce((s,r)=>s+(r.tongGiaVon||0),0);
+    const gg=arr.reduce((s,r)=>s+(r.tongGiamGia||0),0);
+    const dtSau=arr.reduce((s,r)=>s+(r.tongThanhTien||0),0);
+    const ln=dt-gv;
+    const lnSau=dtSau-gv;
+    const sl=arr.reduce((s,r)=>s+(r.sl||0),0);
+    return{dt,gv,gg,dtSau,ln,lnSau,sl,n:arr.length};
+  }
+  const all=calc(rows),pt=calc(ptRows),th=calc(thRows);
+
+  const fB=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
+  const fPct=(a,b)=>b>0?'<span style="font-weight:700;color:'+(a/b>=0.35?'#1a6b3c':a/b>=0.2?'#f0a500':'#e53e3e')+'">'+(a/b*100).toFixed(1)+'%</span>':'<span style="color:#aaa">–</span>';
+
+  const fromFmt=new Date(from).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const toFmt=new Date(to).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const nDays=Math.round((d2-d1)/(86400000))+1;
+
+  function card(title,color,icon,data,cnTong,cnCu){
+    const hasCN=cnTong!==null;
+    return`<div style="background:#fff;border-radius:12px;border:1.5px solid ${color}20;box-shadow:0 2px 8px #0001;overflow:hidden;margin-bottom:16px">
+      <div style="background:${color}12;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid ${color}20">
+        <div style="font-weight:700;font-size:15px;color:${color}">${icon} ${title}</div>
+        <div style="font-size:12px;color:#888">${data.n} đơn · ${fB(data.sl)} SP</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#f0f0f0">
+        <div style="background:#fff;padding:14px 16px">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">DT trước giảm giá</div>
+          <div style="font-size:16px;font-weight:700;color:#2d3748">${fB(data.dt)}</div>
+          <div style="font-size:11px;color:#aaa;margin-top:2px">Giảm giá: ${fB(data.gg)}</div>
+        </div>
+        <div style="background:#fff;padding:14px 16px">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">LN trước giảm giá</div>
+          <div style="font-size:16px;font-weight:700;color:#2d3748">${fB(data.ln)}</div>
+          <div style="font-size:11px;margin-top:2px">TSLN: ${fPct(data.ln,data.dt)}</div>
+        </div>
+        <div style="background:#fff;padding:14px 16px">
+          <div style="font-size:11px;color:#888;margin-bottom:4px">DT sau giảm giá</div>
+          <div style="font-size:16px;font-weight:700;color:#2d3748">${fB(data.dtSau)}</div>
+          <div style="font-size:11px;margin-top:2px">LN sau GG: ${fPct(data.lnSau,data.dtSau)}</div>
+        </div>
+      </div>
+      ${hasCN?`<div style="background:#f8fafc;padding:10px 18px;border-top:1px solid #eee;display:flex;gap:24px;flex-wrap:wrap">
+        <div style="font-size:12px;color:#555">💳 <b>Tổng thu CN</b> (${cnLabel}): <span style="font-weight:700;color:#2d3748">${fB(cnTong)}</span></div>
+        <div style="font-size:12px;color:#555">📌 <b>CN Cũ đã thu</b>: <span style="font-weight:700;color:#2d3748">${fB(cnCu)}</span></div>
+      </div>`:`<div style="background:#f8fafc;padding:8px 18px;border-top:1px solid #eee"><span style="font-size:11px;color:#aaa">💳 Thu công nợ: Xem tổng hệ thống bên trên</span></div>`}
+    </div>`;
+  }
+
+  el.innerHTML=`
+    <div style="font-size:13px;color:#555;margin-bottom:14px;padding:8px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid #3182ce">
+      📅 Tuần <b>${fromFmt}</b> – <b>${toFmt}</b> &nbsp;|&nbsp; ${nDays} ngày &nbsp;|&nbsp; ${rows.length} đơn hàng &nbsp;|&nbsp; ${fB(rows.reduce((s,r)=>s+(r.sl||0),0))} sản phẩm
+    </div>
+    ${card('Toàn hệ thống','#3182ce','🏪',all,cnTongAll,cnCuAll)}
+    ${card('Phúc Tea','#1a6b3c','🍵',pt,null,null)}
+    ${card('The Hoa','#6b21a8','🌸',th,null,null)}
+  `;
+}
+
 function showTab(name,el){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
@@ -2200,6 +2328,7 @@ function showTab(name,el){
   if(name==='st')renderStPage();
   if(name==='pd')renderPdPage();
   if(name==='miss')renderMissPage();
+  if(name==='week'){setWeek7d();}
   if(name==='yoy')renderYoY();
   if(name==='kpi'){loadKPI();fetchKPIFromSheet().then(()=>recalcKPI());}
   if(name==='bod'){loadKPI();renderBOD();}
