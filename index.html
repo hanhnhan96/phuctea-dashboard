@@ -93,8 +93,9 @@ tr:last-child td{border-bottom:none}
 .ov-mnav-btn{border:1px solid var(--bdr);background:#fff;color:var(--g);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1.4}
 .ov-mnav-btn:hover,.ov-mnav-btn.today{background:var(--g);color:#fff;border-color:var(--g)}
 .ov-mnav-label{font-size:17px;font-weight:800;color:var(--g);min-width:100px;text-align:center}
-.tab-group-lbl{font-size:9px;font-weight:800;color:var(--muted);letter-spacing:1.2px;padding:0 4px 0 10px;align-self:center;opacity:.65;white-space:nowrap}
-.tab-sep{width:1px;background:var(--bdr);height:22px;margin:0 6px;align-self:center;flex-shrink:0}
+.tab-group-lbl{font-size:10px;font-weight:800;color:#fff;letter-spacing:.8px;padding:3px 8px;border-radius:4px;align-self:center;white-space:nowrap;flex-shrink:0;background:var(--g);opacity:.85}
+.tab-sep{width:1px;background:var(--bdr);height:22px;margin:0 8px;align-self:center;flex-shrink:0}
+.tab-group2 .tab-group-lbl{background:#6b21a8}
 @media print{.filters,.tabs{display:none!important}.page{display:block!important}body{background:#fff}}
 
 .kpi-tab-wrap{overflow-x:auto}
@@ -228,18 +229,18 @@ tr:last-child td{border-bottom:none}
   <button class="ds-btn" onclick="fetchSalesFromSheet()">🔄 Tải lại ngay</button>
 </div>
 <div class="tabs">
-  <span class="tab-group-lbl">THEO DÕI</span>
-  <div class="tab on" onclick="showTab('ov',this)">🏠 Tổng quan</div>
-  <div class="tab" onclick="showTab('week',this)">📅 Báo cáo Tuần</div>
-  <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo BOD</div>
+  <span class="tab-group-lbl" title="Nhóm báo cáo theo dõi hàng ngày">📊 Theo dõi</span>
+  <div class="tab on" onclick="showTab('ov',this)">Tổng quan</div>
+  <div class="tab" onclick="showTab('week',this)">📅 Tuần</div>
+  <div class="tab" onclick="showTab('bod',this)">📋 BOD</div>
   <div class="tab-sep"></div>
-  <span class="tab-group-lbl">PHÂN TÍCH</span>
+  <span class="tab-group-lbl" style="background:#3182ce" title="Nhóm phân tích chuyên sâu">🔍 Phân tích</span>
   <div class="tab" onclick="showTab('cmp',this)">So sánh tháng</div>
   <div class="tab" onclick="showTab('st',this)">Cửa hàng</div>
   <div class="tab" onclick="showTab('pd',this)">Sản phẩm</div>
   <div class="tab" onclick="showTab('miss',this)">📦 SP NVL</div>
-  <div class="tab" onclick="showTab('yoy',this)">📈 So sánh YoY</div>
-  <div class="tab" onclick="showTab('kpi',this)">🎯 KPI Mục tiêu</div>
+  <div class="tab" onclick="showTab('yoy',this)">📈 YoY</div>
+  <div class="tab" onclick="showTab('kpi',this)">🎯 KPI</div>
 </div>
 
 <div class="main">
