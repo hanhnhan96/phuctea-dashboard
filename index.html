@@ -385,6 +385,7 @@ tr:last-child td{border-bottom:none}
 <!-- SẢN PHẨM -->
 <div class="page" id="page-pd">
   <p class="stitle">Phân tích Sản phẩm</p>
+  <div id="pdFilterInfo" style="font-size:12px;color:#3182ce;background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:7px 14px;margin-bottom:14px;display:none"></div>
   <div class="row22" style="margin-bottom:16px">
     <div class="cc">
       <div class="ch"><div class="ctitle">Top 15 sản phẩm – Doanh thu</div></div>
@@ -1515,8 +1516,21 @@ function renderStPage(){
 
 // ===== TAB SẢN PHẨM =====
 function renderPdPage(){
+  // Hiển thị bộ lọc đang áp dụng
+  const _f=getF();
+  const _fi=document.getElementById('pdFilterInfo');
+  if(_fi){
+    const _parts=[];
+    if(_f.brand) _parts.push('Thương hiệu: <b>'+_f.brand+'</b>');
+    if(_f.month) _parts.push('Tháng: <b>T'+_f.month+'</b>');
+    if(_f.from||_f.to) _parts.push('Từ <b>'+(_f.from||'…')+'</b> đến <b>'+(_f.to||'…')+'</b>');
+    if(_f.store) _parts.push('Cửa hàng: <b>'+_f.store+'</b>');
+    if(_f.cat) _parts.push('Danh mục: <b>'+_f.cat+'</b>');
+    if(_parts.length){_fi.innerHTML='🔍 Đang lọc theo: '+_parts.join(' · ')+' — <b>'+filt.length.toLocaleString('vi-VN')+' dòng</b>';_fi.style.display='block';}
+    else{_fi.innerHTML='📊 Hiển thị toàn bộ dữ liệu — <b>'+filt.length.toLocaleString('vi-VN')+' dòng</b>';_fi.style.display='block';}
+  }
   const gr={},cgr={};
-  D_CY.forEach(r=>{
+  filt.forEach(r=>{
     if(!gr[r.sanPham])gr[r.sanPham]={dt:0,ln:0,sl:0,cat:r.loaiHang};
     gr[r.sanPham].dt+=(r.thanhTien||0);gr[r.sanPham].ln+=(r.lnThuc||0);gr[r.sanPham].sl+=r.sl;
     if(!cgr[r.loaiHang])cgr[r.loaiHang]={dt:0,sl:0,ln:0};
