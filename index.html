@@ -93,6 +93,8 @@ tr:last-child td{border-bottom:none}
 .ov-mnav-btn{border:1px solid var(--bdr);background:#fff;color:var(--g);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1.4}
 .ov-mnav-btn:hover,.ov-mnav-btn.today{background:var(--g);color:#fff;border-color:var(--g)}
 .ov-mnav-label{font-size:17px;font-weight:800;color:var(--g);min-width:100px;text-align:center}
+.tab-group-lbl{font-size:9px;font-weight:800;color:var(--muted);letter-spacing:1.2px;padding:0 4px 0 10px;align-self:center;opacity:.65;white-space:nowrap}
+.tab-sep{width:1px;background:var(--bdr);height:22px;margin:0 6px;align-self:center;flex-shrink:0}
 @media print{.filters,.tabs{display:none!important}.page{display:block!important}body{background:#fff}}
 
 .kpi-tab-wrap{overflow-x:auto}
@@ -226,13 +228,16 @@ tr:last-child td{border-bottom:none}
   <button class="ds-btn" onclick="fetchSalesFromSheet()">🔄 Tải lại ngay</button>
 </div>
 <div class="tabs">
-  <div class="tab on" onclick="showTab('ov',this)">Tổng quan</div>
+  <span class="tab-group-lbl">THEO DÕI</span>
+  <div class="tab on" onclick="showTab('ov',this)">🏠 Tổng quan</div>
+  <div class="tab" onclick="showTab('week',this)">📅 Báo cáo Tuần</div>
+  <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo BOD</div>
+  <div class="tab-sep"></div>
+  <span class="tab-group-lbl">PHÂN TÍCH</span>
   <div class="tab" onclick="showTab('cmp',this)">So sánh tháng</div>
   <div class="tab" onclick="showTab('st',this)">Cửa hàng</div>
   <div class="tab" onclick="showTab('pd',this)">Sản phẩm</div>
-  <div class="tab" onclick="showTab('miss',this)">📦 SP Nguyên/Vật liệu chưa nhập</div>
-  <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo BOD</div>
-  <div class="tab" onclick="showTab('week',this)">📅 Báo cáo Tuần</div>
+  <div class="tab" onclick="showTab('miss',this)">📦 SP NVL</div>
   <div class="tab" onclick="showTab('yoy',this)">📈 So sánh YoY</div>
   <div class="tab" onclick="showTab('kpi',this)">🎯 KPI Mục tiêu</div>
 </div>
@@ -250,6 +255,7 @@ tr:last-child td{border-bottom:none}
     <button class="ov-mnav-btn" id="ovMNavTodayBtn" onclick="ovNavToday()">Tháng này</button>
     <div style="margin-left:auto;font-size:11px;color:var(--muted)" id="ovMNavSub"></div>
   </div>
+  <div id="ovAlerts" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px"></div>
   <div class="kgrid">
     <div class="kc gr"><div class="klbl">Doanh Thu</div><div class="kval" id="k0">–</div><div id="k0b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k0s"></div></div>
     <div class="kc go"><div class="klbl">Số Lượng Bán</div><div class="kval" id="k1">–</div><div id="k1b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k1s"></div></div>
@@ -284,7 +290,8 @@ tr:last-child td{border-bottom:none}
           <button class="tb" id="sLN" onclick="setSM('ln',this)">Lợi nhuận</button>
         </div>
       </div>
-      <div style="position:relative;height:270px"><canvas id="cStore"></canvas></div>
+      <div style="position:relative;height:220px"><canvas id="cStore"></canvas></div>
+      <div id="storeOvTable" style="margin-top:8px;font-size:11px;overflow-x:auto"></div>
     </div>
     <div class="cc">
       <div class="ch"><div><div class="ctitle">So Sánh Tháng</div><div class="csub">Doanh thu &amp; Lợi nhuận T1 – T3</div></div></div>
@@ -1175,6 +1182,7 @@ function renderKPI(){
   k0.innerHTML=fmtB(dt);k1.innerHTML=fmt(Math.round(sl));k2.innerHTML=fmtB(ln);
   k3.innerHTML=pct(mg);k4.innerHTML=fmtB(gg);k5.innerHTML=ch+' CH';
   k3.style.color=mg>=.3?'#2d9e5f':mg>=.2?'#d69e2e':'#e53e3e';
+  renderOvAlerts();
   // --- Badges ---
   const _selM=parseInt(document.getElementById('fMonth')?.value||0);
   function _badge(id,txt,cls){const e=document.getElementById(id);if(!e)return;e.textContent=txt;e.className='kbadge '+cls;e.style.display='inline-block';}
@@ -1254,6 +1262,45 @@ function renderStoreOv(){
       plugins:{legend:{display:false},datalabels:{display:false}},
       scales:{x:{ticks:{callback:v=>fmtB(v)},grid:{color:'#f0f0f0'}},y:{grid:{display:false},ticks:{font:{size:10}}}}}
   });
+  // Mini MoM / YoY table
+  const selM=parseInt(document.getElementById('fMonth')?.value||0);
+  const selY=parseInt(document.getElementById('fYear')?.value||2026);
+  const tbl=document.getElementById('storeOvTable');
+  if(tbl&&selM&&selY){
+    const prevM=selM===1?12:selM-1, prevY=selM===1?selY-1:selY;
+    const prevGr={},lyGr={};
+    D_ALL.filter(r=>r.nam===prevY&&r.thang===prevM).forEach(r=>{if(!prevGr[r.chiNhanh])prevGr[r.chiNhanh]=0;prevGr[r.chiNhanh]+=(r.thanhTien||0);});
+    D_ALL.filter(r=>r.nam===(selY-1)&&r.thang===selM).forEach(r=>{if(!lyGr[r.chiNhanh])lyGr[r.chiNhanh]=0;lyGr[r.chiNhanh]+=(r.thanhTien||0);});
+    const dlt=(c,p)=>{if(!p||!c)return'<span style="color:#aaa">–</span>';const r=(c-p)/p;const cl=r>=0.02?'#1a6b3c':r<=-0.02?'#c53030':'#888';return`<span style="color:${cl};font-weight:700">${r>=0?'▲':'▼'} ${Math.abs(r*100).toFixed(0)}%</span>`;};
+    let h='<table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f8fafc"><th style="padding:4px 6px;text-align:left;color:#555;font-weight:700">Cửa hàng</th><th style="padding:4px 6px;text-align:right;color:#555;font-weight:700">DT</th><th style="padding:4px 6px;text-align:right;color:#555;font-weight:700">vs T.trước</th><th style="padding:4px 6px;text-align:right;color:#555;font-weight:700">vs Cùng kỳ</th></tr></thead><tbody>';
+    sorted.forEach(([name,d])=>{
+      const lbl=name.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'').slice(0,22);
+      const cur=d[sM]; const p=prevGr[name]||0; const ly=lyGr[name]||0;
+      h+=`<tr style="border-bottom:1px solid #f0f0f0"><td style="padding:3px 6px">${lbl}</td><td style="padding:3px 6px;text-align:right;font-weight:600">${fmtB(cur)}</td><td style="padding:3px 6px;text-align:right">${dlt(cur,p)}</td><td style="padding:3px 6px;text-align:right">${dlt(cur,ly)}</td></tr>`;
+    });
+    tbl.innerHTML=h+'</tbody></table>';
+  } else if(tbl){tbl.innerHTML='';}
+  renderOvAlerts();
+}
+function renderOvAlerts(){
+  const el=document.getElementById('ovAlerts');
+  if(!el)return;
+  const selM=parseInt(document.getElementById('fMonth')?.value||0);
+  const selY=parseInt(document.getElementById('fYear')?.value||2026);
+  if(!selM||!filt.length){el.innerHTML='';return;}
+  const prevM=selM===1?12:selM-1, prevY=selM===1?selY-1:selY;
+  const cur={},prev={};
+  filt.forEach(r=>{if(!cur[r.chiNhanh])cur[r.chiNhanh]=0;cur[r.chiNhanh]+=(r.thanhTien||0);});
+  D_ALL.filter(r=>r.nam===prevY&&r.thang===prevM).forEach(r=>{if(!prev[r.chiNhanh])prev[r.chiNhanh]=0;prev[r.chiNhanh]+=(r.thanhTien||0);});
+  let up=0,dn=0;
+  Object.keys(cur).forEach(s=>{const p=prev[s];if(!p)return;if(cur[s]>p*1.02)up++;else if(cur[s]<p*0.98)dn++;});
+  const chip=(txt,bg,cl)=>`<span style="display:inline-flex;align-items:center;gap:3px;background:${bg};color:${cl};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">${txt}</span>`;
+  let h='';
+  if(dn>0)h+=chip(`🔴 ${dn} cửa hàng giảm DT so với T${prevM}`,'#fff0f0','#c53030')+' ';
+  if(up>0)h+=chip(`✅ ${up} cửa hàng tăng DT`,'#e8f5ee','#1a6b3c')+' ';
+  const dtKH=selM&&_kpiCache['dt_bh_kh_'+selM]?_kpiCache['dt_bh_kh_'+selM]:null;
+  if(!dtKH)h+=chip('⚠️ Chưa có KH tháng này','#fff8e6','#7a5800');
+  el.innerHTML=h;
 }
 
 // ===== SO SÁNH THÁNG (OVERVIEW) =====
