@@ -166,10 +166,14 @@ tr:last-child td{border-bottom:none}
 @media print{
   .hdr,.filters,.tabs,.stitle,.no-print{display:none!important}
   .page{display:block!important}
-  .page:not(#page-bod){display:none!important}
+  body:not(.printing-week) .page:not(#page-bod){display:none!important}
+  body.printing-week .page:not(#page-week){display:none!important}
   body{background:white}
   .bod-section{box-shadow:none;border:1px solid #ddd}
+  body.printing-week #page-week{padding:0!important}
+  .week-print-header{display:block!important}
 }
+.week-print-header{display:none}
 
 </style>
 </head>
@@ -542,7 +546,7 @@ tr:last-child td{border-bottom:none}
 <!-- BÁO CÁO TUẦN -->
 <div class="page" id="page-week">
   <p class="stitle">📅 Báo cáo Tuần</p>
-  <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px">
+  <div class="no-print" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px">
     <div>
       <div style="font-size:11px;color:#888;margin-bottom:4px">Từ ngày</div>
       <input type="date" id="weekFrom" class="filter-sel" onchange="renderWeekReport()" style="padding:6px 10px">
@@ -556,6 +560,13 @@ tr:last-child td{border-bottom:none}
       <button class="ds-btn" onclick="setWeekLast()">Tuần trước</button>
       <button class="ds-btn" onclick="setWeek7d()">7 ngày gần đây</button>
     </div>
+    <div style="margin-left:auto">
+      <button class="ds-btn" onclick="printWeekReport()" style="background:#e53e3e;color:#fff;border-color:#e53e3e;font-weight:700;padding:7px 16px">🖨️ Gửi PDF</button>
+    </div>
+  </div>
+  <div class="week-print-header" style="margin-bottom:16px">
+    <div style="font-size:18px;font-weight:700;color:#2d3748">PHÚC TEA – BÁO CÁO TUẦN</div>
+    <div id="weekPrintSub" style="font-size:13px;color:#666;margin-top:4px"></div>
   </div>
   <div id="weekReport"><div style="color:#aaa;padding:24px">Chọn khoảng thời gian để xem báo cáo.</div></div>
 </div>
@@ -1023,6 +1034,7 @@ function onMonthChange(){
 
 // ===== THU CÔNG NỢ – LIVE DATA =====
 let _cnBH={}, _cnKPI={};
+let _cnBHDay={}, _cnKPIDay={}; // keyed by yyyy-MM-dd
 
 async function fetchCNFromSheet(){
   const url=`https://docs.google.com/spreadsheets/d/1DR4q16Whx7QFlw3KIPbtR-6RpbDpwQ1MeOyT3faHnu4/gviz/tq?tqx=out:csv&sheet=THU%20C%C3%94NG%20N%E1%BB%A2`;
@@ -1033,18 +1045,26 @@ async function fetchCNFromSheet(){
     if(!text||text.trim().startsWith('<')) throw new Error('Sheet chua public');
     const rows=parseSalesCSV(text);
     if(rows.length<2) return;
-    _cnBH={}; _cnKPI={};
+    _cnBH={}; _cnKPI={}; _cnBHDay={}; _cnKPIDay={};
     for(let i=1;i<rows.length;i++){
       const r=rows[i];
       if(r[5]){
         const d=parseSalesDate(r[5]);
-        if(d){const yr=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7));
-          if(yr&&mo){const k=yr+'-'+mo;_cnBH[k]=(_cnBH[k]||0)+(parseSalesNum(r[6])||0);}}
+        if(d){
+          const yr=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7));
+          const v=parseSalesNum(r[6])||0;
+          if(yr&&mo){const k=yr+'-'+mo;_cnBH[k]=(_cnBH[k]||0)+v;}
+          _cnBHDay[d]=(_cnBHDay[d]||0)+v;
+        }
       }
       if(r[9]){
         const d=parseSalesDate(r[9]);
-        if(d){const yr=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7));
-          if(yr&&mo){const k=yr+'-'+mo;_cnKPI[k]=(_cnKPI[k]||0)+(parseSalesNum(r[10])||0);}}
+        if(d){
+          const yr=parseInt(d.slice(0,4)),mo=parseInt(d.slice(5,7));
+          const v=parseSalesNum(r[10])||0;
+          if(yr&&mo){const k=yr+'-'+mo;_cnKPI[k]=(_cnKPI[k]||0)+v;}
+          _cnKPIDay[d]=(_cnKPIDay[d]||0)+v;
+        }
       }
     }
     applyCNToKPI();
@@ -2239,6 +2259,11 @@ function setWeek7d(){
   document.getElementById('weekTo').value=now.toISOString().slice(0,10);
   renderWeekReport();
 }
+function printWeekReport(){
+  document.body.classList.add('printing-week');
+  window.print();
+  setTimeout(()=>document.body.classList.remove('printing-week'),1000);
+}
 function renderWeekReport(){
   const from=document.getElementById('weekFrom')?.value;
   const to=document.getElementById('weekTo')?.value;
@@ -2249,15 +2274,12 @@ function renderWeekReport(){
   const ptRows=rows.filter(r=>r.brand==='PHÚC TEA');
   const thRows=rows.filter(r=>r.brand==='THE HOA');
 
-  // CN months overlapping with range
+  // CN daily sum within range
   const d1=new Date(from),d2=new Date(to);
-  const cnMonths=[];
-  let cy=d1.getFullYear(),cm=d1.getMonth()+1;
-  const ey=d2.getFullYear(),em=d2.getMonth()+1;
-  while(cy<ey||(cy===ey&&cm<=em)){cnMonths.push(cy+'-'+cm);cm++;if(cm>12){cm=1;cy++;}}
-  const cnTongAll=cnMonths.reduce((s,k)=>s+(_cnBH[k]||0),0);
-  const cnCuAll=cnMonths.reduce((s,k)=>s+(_cnKPI[k]||0),0);
-  const cnLabel=cnMonths.map(k=>{const p=k.split('-');return'T'+p[1]+'/'+p[0];}).join(', ');
+  let cnTongAll=0,cnCuAll=0;
+  for(const [k,v] of Object.entries(_cnBHDay)){if(k>=from&&k<=to)cnTongAll+=v;}
+  for(const [k,v] of Object.entries(_cnKPIDay)){if(k>=from&&k<=to)cnCuAll+=v;}
+  const cnLabel=from===to?from:from+' → '+to;
 
   function calc(arr){
     const dt=arr.reduce((s,r)=>s+(r.thanhTien||0),0);
@@ -2308,6 +2330,9 @@ function renderWeekReport(){
       </div>`:`<div style="background:#f8fafc;padding:8px 18px;border-top:1px solid #eee"><span style="font-size:11px;color:#aaa">💳 Thu công nợ: Xem tổng hệ thống bên trên</span></div>`}
     </div>`;
   }
+
+  const printSub=document.getElementById('weekPrintSub');
+  if(printSub) printSub.textContent=`Tuần ${fromFmt} – ${toFmt}  |  Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`;
 
   el.innerHTML=`
     <div style="font-size:13px;color:#555;margin-bottom:14px;padding:8px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid #3182ce">
