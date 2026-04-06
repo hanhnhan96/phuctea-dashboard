@@ -333,6 +333,27 @@ tr:last-child td{border-bottom:none}
       </table>
     </div>
   </div>
+
+  <!-- DOANH THU THEO KỲ / CỬA HÀNG -->
+  <div class="cc" style="margin-top:16px">
+    <div class="ch">
+      <div><div class="ctitle">Doanh thu theo kỳ của từng cửa hàng</div><div class="csub">Pivot: cửa hàng × tháng/quý/năm</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <select id="stPivotType" class="filter-sel" onchange="renderStPivot()">
+          <option value="month">Theo tháng</option>
+          <option value="quarter">Theo quý</option>
+          <option value="year">Cả năm</option>
+        </select>
+        <select id="stPivotYear" class="filter-sel" onchange="renderStPivot()"></select>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="padding:0;overflow-x:auto">
+      <table id="stPivotTable" style="font-size:11px;min-width:600px">
+        <thead id="stPivotHead"></thead>
+        <tbody id="stPivotBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- SẢN PHẨM -->
@@ -519,108 +540,78 @@ tr:last-child td{border-bottom:none}
 
 <!-- SO SÁNH YOY -->
 <div class="page" id="page-yoy">
-  <p class="stitle">📈 So sánh Năm 2025 vs 2026</p>
+  <p class="stitle">📈 So sánh theo Kỳ</p>
 
-  <div class="miss-filters" style="margin-bottom:14px">
-    <div class="fg"><label>Xem theo</label>
-      <select id="yPeriod" onchange="renderYoY()">
-        <option value="month">Theo tháng</option>
-        <option value="quarter">Theo quý</option>
-        <option value="year">Cả năm</option>
-      </select>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:11px;font-weight:700;color:#3182ce">● Kỳ A</span>
+      <div style="display:flex;gap:4px">
+        <select id="yYearA" class="filter-sel" onchange="renderYoY()" style="width:72px"></select>
+        <select id="yTypeA" class="filter-sel" onchange="updateYoYPicker('A');renderYoY()" style="width:80px">
+          <option value="month">Tháng</option>
+          <option value="quarter" selected>Quý</option>
+          <option value="year">Cả năm</option>
+        </select>
+        <select id="yValA" class="filter-sel" onchange="renderYoY()" style="width:70px"></select>
+      </div>
     </div>
-    <div class="fg"><label>Tháng / Quý</label>
-      <select id="yMonth" onchange="renderYoY()">
-        <option value="0">Tất cả</option>
-        <option value="1">Tháng 1</option>
-        <option value="2">Tháng 2</option>
-        <option value="3">Tháng 3</option>
-        <option value="4">Tháng 4</option>
-        <option value="5">Tháng 5</option>
-        <option value="6">Tháng 6</option>
-        <option value="7">Tháng 7</option>
-        <option value="8">Tháng 8</option>
-        <option value="9">Tháng 9</option>
-        <option value="10">Tháng 10</option>
-        <option value="11">Tháng 11</option>
-        <option value="12">Tháng 12</option>
-      </select>
+    <span style="font-weight:700;color:#6b7a8d;align-self:flex-end;padding-bottom:4px">vs</span>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:11px;font-weight:700;color:#38a169">● Kỳ B</span>
+      <div style="display:flex;gap:4px">
+        <select id="yYearB" class="filter-sel" onchange="renderYoY()" style="width:72px"></select>
+        <select id="yTypeB" class="filter-sel" onchange="updateYoYPicker('B');renderYoY()" style="width:80px">
+          <option value="month">Tháng</option>
+          <option value="quarter" selected>Quý</option>
+          <option value="year">Cả năm</option>
+        </select>
+        <select id="yValB" class="filter-sel" onchange="renderYoY()" style="width:70px"></select>
+      </div>
     </div>
-    <div class="fg"><label>Cửa hàng</label>
-      <select id="yStore" onchange="renderYoY()"><option value="">Tất cả</option></select>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span style="font-size:11px;font-weight:700;color:#555">Cửa hàng</span>
+      <select id="yStore" class="filter-sel" onchange="renderYoY()"><option value="">Tất cả</option></select>
     </div>
   </div>
 
   <!-- KPI so sánh -->
-  <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
-    <div class="kc go">
-      <div class="klbl">Doanh thu 2026</div>
-      <div class="kval" id="yk_dt26">–</div>
-      <div class="ksub" id="yk_dt_d">–</div>
-    </div>
-    <div class="kc go">
-      <div class="klbl">Doanh thu 2025 (cùng kỳ)</div>
-      <div class="kval" id="yk_dt25">–</div>
-      <div class="ksub" id="yk_dt_pct">–</div>
-    </div>
-    <div class="kc gr">
-      <div class="klbl">Lợi nhuận 2026</div>
-      <div class="kval" id="yk_ln26">–</div>
-      <div class="ksub" id="yk_ln_d">–</div>
-    </div>
-    <div class="kc gr">
-      <div class="klbl">Lợi nhuận 2025 (cùng kỳ)</div>
-      <div class="kval" id="yk_ln25">–</div>
-      <div class="ksub" id="yk_ln_pct">–</div>
-    </div>
-    <div class="kc bl">
-      <div class="klbl">Số lượng 2026</div>
-      <div class="kval" id="yk_sl26">–</div>
-      <div class="ksub" id="yk_sl_d">–</div>
-    </div>
-    <div class="kc bl">
-      <div class="klbl">Số lượng 2025 (cùng kỳ)</div>
-      <div class="kval" id="yk_sl25">–</div>
-      <div class="ksub" id="yk_sl_pct">–</div>
-    </div>
-    <div class="kc rd">
-      <div class="klbl">TSLN 2026</div>
-      <div class="kval" id="yk_tsln26">–</div>
-      <div class="ksub" id="yk_tsln_d">–</div>
-    </div>
-    <div class="kc rd">
-      <div class="klbl">TSLN 2025 (cùng kỳ)</div>
-      <div class="kval" id="yk_tsln25">–</div>
-      <div class="ksub" id="yk_tsln_pct">–</div>
-    </div>
+  <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px" id="yoyKPIGrid">
+    <div class="kc go"><div class="klbl" id="yk_lbl_dtA">Kỳ A – DT</div><div class="kval" id="yk_dt26">–</div><div class="ksub" id="yk_dt_d">–</div></div>
+    <div class="kc go"><div class="klbl" id="yk_lbl_dtB">Kỳ B – DT</div><div class="kval" id="yk_dt25">–</div><div class="ksub" id="yk_dt_pct">–</div></div>
+    <div class="kc gr"><div class="klbl" id="yk_lbl_lnA">Kỳ A – LN</div><div class="kval" id="yk_ln26">–</div><div class="ksub" id="yk_ln_d">–</div></div>
+    <div class="kc gr"><div class="klbl" id="yk_lbl_lnB">Kỳ B – LN</div><div class="kval" id="yk_ln25">–</div><div class="ksub" id="yk_ln_pct">–</div></div>
+    <div class="kc bl"><div class="klbl" id="yk_lbl_slA">Kỳ A – SL</div><div class="kval" id="yk_sl26">–</div><div class="ksub" id="yk_sl_d">–</div></div>
+    <div class="kc bl"><div class="klbl" id="yk_lbl_slB">Kỳ B – SL</div><div class="kval" id="yk_sl25">–</div><div class="ksub" id="yk_sl_pct">–</div></div>
+    <div class="kc rd"><div class="klbl" id="yk_lbl_tsA">Kỳ A – TSLN</div><div class="kval" id="yk_tsln26">–</div><div class="ksub" id="yk_tsln_d">–</div></div>
+    <div class="kc rd"><div class="klbl" id="yk_lbl_tsB">Kỳ B – TSLN</div><div class="kval" id="yk_tsln25">–</div><div class="ksub" id="yk_tsln_pct">–</div></div>
   </div>
 
   <!-- Biểu đồ -->
   <div class="row22" style="margin-bottom:16px">
     <div class="cc">
-      <div class="ch"><div><div class="ctitle">Doanh thu theo Tháng – 2025 vs 2026</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
+      <div class="ch"><div><div class="ctitle" id="yoyChTitle1">So sánh Doanh thu</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
       <div style="position:relative;height:280px"><canvas id="cYoyDT"></canvas></div>
     </div>
     <div class="cc">
-      <div class="ch"><div><div class="ctitle">Lợi nhuận theo Tháng – 2025 vs 2026</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
+      <div class="ch"><div><div class="ctitle" id="yoyChTitle2">So sánh Lợi nhuận</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
       <div style="position:relative;height:280px"><canvas id="cYoyLN"></canvas></div>
     </div>
   </div>
 
   <div class="row22" style="margin-bottom:16px">
     <div class="cc">
-      <div class="ch"><div><div class="ctitle">Tăng trưởng Doanh thu (%)</div><div class="csub">% thay đổi từng tháng so với cùng kỳ 2025</div></div></div>
+      <div class="ch"><div><div class="ctitle" id="yoyChTitle3">% Tăng trưởng DT</div><div class="csub">% thay đổi từng tháng so với cùng kỳ 2025</div></div></div>
       <div style="position:relative;height:240px"><canvas id="cYoyGrowth"></canvas></div>
     </div>
     <div class="cc">
-      <div class="ch"><div><div class="ctitle">Số lượng bán theo Tháng</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
+      <div class="ch"><div><div class="ctitle" id="yoyChTitle4">So sánh Số lượng</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
       <div style="position:relative;height:240px"><canvas id="cYoySL"></canvas></div>
     </div>
   </div>
 
   <!-- Bảng chi tiết theo tháng -->
   <div class="cc" style="margin-bottom:16px">
-    <div class="ch"><div><div class="ctitle">Chi tiết so sánh theo Tháng</div><div class="csub">Doanh thu, Lợi nhuận, Số lượng – 2025 vs 2026</div></div></div>
+    <div class="ch"><div><div class="ctitle" id="yoyChTitle5">Chi tiết so sánh</div><div class="csub">Doanh thu, Lợi nhuận, Số lượng – 2025 vs 2026</div></div></div>
     <div class="tbl-wrap">
       <table>
         <thead>
@@ -1205,6 +1196,61 @@ function renderMComp(){
   });
 }
 
+// ===== STORE PIVOT =====
+function initStPivot(){
+  const years=[...new Set(D_ALL.map(r=>r.nam).filter(y=>y&&!isNaN(y)))].sort((a,b)=>b-a);
+  const el=document.getElementById('stPivotYear');
+  if(!el||el.options.length) return;
+  el.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
+}
+
+function renderStPivot(){
+  initStPivot();
+  const type=document.getElementById('stPivotType')?.value||'month';
+  const year=+document.getElementById('stPivotYear')?.value||2026;
+  const rows=D_ALL.filter(r=>r.nam===year);
+
+  // Build period keys
+  let periods;
+  if(type==='month') periods=Array.from({length:12},(_,i)=>i+1).filter(m=>rows.some(r=>r.thang===m));
+  else if(type==='quarter') periods=[1,2,3,4].filter(q=>rows.some(r=>Math.ceil(r.thang/3)===q));
+  else periods=[year];
+
+  function periodKey(r){ if(type==='month')return r.thang; if(type==='quarter')return Math.ceil(r.thang/3); return year; }
+  function periodLabel(p){ if(type==='month')return 'T'+p; if(type==='quarter')return 'Q'+p; return String(year); }
+
+  // Aggregate store × period
+  const map={};
+  rows.forEach(r=>{
+    const s=r.chiNhanh||'–';
+    const pk=periodKey(r);
+    if(!periods.includes(pk)) return;
+    if(!map[s]) map[s]={total:0};
+    if(!map[s][pk]) map[s][pk]=0;
+    map[s][pk]+=(r.thanhTien||0);
+    map[s].total+=(r.thanhTien||0);
+  });
+
+  const sortedStores=Object.entries(map).sort((a,b)=>b[1].total-a[1].total);
+  const totalRow={total:0};
+  periods.forEach(p=>{ totalRow[p]=sortedStores.reduce((s,[,v])=>s+(v[p]||0),0); totalRow.total+=totalRow[p]; });
+
+  // Header
+  const thead=document.getElementById('stPivotHead');
+  if(thead) thead.innerHTML=`<tr><th style="text-align:left;min-width:180px">Cửa hàng</th>${periods.map(p=>`<th>${periodLabel(p)}</th>`).join('')}<th style="background:#f0f7f3">Tổng</th></tr>`;
+
+  // Body
+  let tb='';
+  sortedStores.forEach(([s,v])=>{
+    const name=s.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
+    tb+=`<tr><td style="font-weight:600;font-size:11px">${name}</td>${periods.map(p=>`<td>${v[p]?fmtB(v[p]):'–'}</td>`).join('')}<td style="font-weight:700;color:var(--g)">${fmtB(v.total)}</td></tr>`;
+  });
+  // Total row
+  tb+=`<tr style="background:#f0f7f3;font-weight:700"><td>TỔNG</td>${periods.map(p=>`<td>${fmtB(totalRow[p]||0)}</td>`).join('')}<td>${fmtB(totalRow.total)}</td></tr>`;
+  const tbody=document.getElementById('stPivotBody');
+  if(tbody) tbody.innerHTML=tb;
+}
+
 // ===== TAB SO SÁNH THÁNG =====
 function initCmpFilter(){
   const MNs=['','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12'];
@@ -1339,6 +1385,8 @@ function renderStPage(){
     </tr>`;
   });
   document.getElementById('stTbody').innerHTML=tb;
+  initStPivot();
+  renderStPivot();
 }
 
 // ===== TAB SẢN PHẨM =====
@@ -1575,110 +1623,171 @@ function onYearChange(){
 }
 
 // ===== TAB SO SÁNH YOY =====
-function renderYoY(){
-  const selM=parseInt(document.getElementById('yMonth').value)||0;
-  const selStore=document.getElementById('yStore').value;
-  const period=document.getElementById('yPeriod').value;
+function initYoYFilters(){
+  const years=[...new Set(D_ALL.map(r=>r.nam).filter(y=>y&&!isNaN(y)))].sort((a,b)=>a-b);
+  ['yYearA','yYearB'].forEach((id,i)=>{
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    el.value=years[i]||years[0]; // A=first year, B=last year
+  });
+  // Default: B = last year
+  const yB=document.getElementById('yYearB');
+  if(yB) yB.value=years[years.length-1]||years[0];
+  updateYoYPicker('A'); updateYoYPicker('B');
+}
 
-  function getRows(year, month){
-    let r=D_ALL.filter(x=>x.nam===year);
+function updateYoYPicker(ab){
+  const type=document.getElementById('yType'+ab)?.value||'quarter';
+  const sel=document.getElementById('yVal'+ab);
+  if(!sel) return;
+  const cur=sel.value;
+  if(type==='month'){
+    sel.innerHTML=['T1','T2','T3','T4','T5','T6','T7','T8','T9','T10','T11','T12']
+      .map((t,i)=>`<option value="${i+1}">${t}</option>`).join('');
+  } else if(type==='quarter'){
+    sel.innerHTML=['Q1','Q2','Q3','Q4'].map((q,i)=>`<option value="${i+1}">${q}</option>`).join('');
+  } else {
+    sel.innerHTML='<option value="0">Cả năm</option>';
+  }
+  if(cur) sel.value=cur;
+}
+
+function getYoYMonths(type, val){
+  const v=+val;
+  if(type==='month') return [v];
+  if(type==='quarter') return [v*3-2,v*3-1,v*3];
+  return [1,2,3,4,5,6,7,8,9,10,11,12];
+}
+
+function yoyPeriodLabel(year, type, val){
+  if(type==='month') return `T${val}/${year}`;
+  if(type==='quarter') return `Q${val}/${year}`;
+  return `Năm ${year}`;
+}
+
+function renderYoY(){
+  if(!document.getElementById('yValA')?.options.length) initYoYFilters();
+  const yearA=+document.getElementById('yYearA')?.value||2025;
+  const yearB=+document.getElementById('yYearB')?.value||2026;
+  const typeA=document.getElementById('yTypeA')?.value||'quarter';
+  const typeB=document.getElementById('yTypeB')?.value||'quarter';
+  const valA=document.getElementById('yValA')?.value||'1';
+  const valB=document.getElementById('yValB')?.value||'1';
+  const selStore=document.getElementById('yStore').value;
+
+  const msA=getYoYMonths(typeA,valA);
+  const msB=getYoYMonths(typeB,valB);
+  const lblA=yoyPeriodLabel(yearA,typeA,valA);
+  const lblB=yoyPeriodLabel(yearB,typeB,valB);
+
+  // Update labels
+  ['dt','ln','sl','ts'].forEach((k,i)=>{
+    const labels=['DT','LN','SL','TSLN'];
+    const el1=document.getElementById('yk_lbl_'+['dtA','lnA','slA','tsA'][i]);
+    const el2=document.getElementById('yk_lbl_'+['dtB','lnB','slB','tsB'][i]);
+    if(el1) el1.textContent=`${lblA} – ${labels[i]}`;
+    if(el2) el2.textContent=`${lblB} – ${labels[i]}`;
+  });
+
+  function getRows(year, months){
+    let r=D_ALL.filter(x=>x.nam===year&&months.includes(x.thang));
     if(selStore) r=r.filter(x=>x.chiNhanh===selStore);
-    if(month) r=r.filter(x=>x.thang===month);
     return r;
   }
   function sumDT(rows){return rows.reduce((s,r)=>s+(r.thanhTien||0),0);}
   function sumLN(rows){return rows.reduce((s,r)=>s+(r.lnThuc||0),0);}
   function sumSL(rows){return rows.reduce((s,r)=>s+(r.sl||0),0);}
-  function calcTSLN(rows){const dt=sumDT(rows);return dt>0?sumLN(rows)/dt:0;}
-  function growthLbl(a,b){
-    if(!b) return a?'<span class="up">Mới 2026</span>':'–';
-    const g=(a-b)/b;
-    return g>=0?`<span class="up">▲ ${pct(g)}</span>`:`<span class="dn">▼ ${pct(Math.abs(g))}</span>`;
-  }
-  function growthVal(a,b){if(!b)return null;return (a-b)/b*100;}
 
-  // Xác định months để hiển thị (chỉ tháng có trong D_ALL 2026)
-  const months2026=[...new Set(D_ALL.filter(r=>r.nam===2026).map(r=>r.thang))].sort((a,b)=>a-b);
-  const months2025=[...new Set(D_ALL.filter(r=>r.nam===2025).map(r=>r.thang))].sort((a,b)=>a-b);
-  // Lấy tháng để so sánh = giao của 2 năm (cùng kỳ)
-  const cmpMonths=selM>0?[selM]:months2026.filter(m=>months2025.includes(m));
+  const rA=getRows(yearA,msA), rB=getRows(yearB,msB);
+  const dtA=sumDT(rA), dtB=sumDT(rB);
+  const lnA=sumLN(rA), lnB=sumLN(rB);
+  const slA=sumSL(rA), slB=sumSL(rB);
+  const tsA=dtA>0?lnA/dtA:0, tsB=dtB>0?lnB/dtB:0;
 
-  // KPI tổng
-  // Cùng kỳ: nếu selM=0 thì so sánh cùng tháng có trong 2026
-  function getRowsCK(year){
-    if(selM>0) return getRows(year,selM);
-    let r=D_ALL.filter(x=>x.nam===year&&cmpMonths.includes(x.thang));
-    if(selStore) r=r.filter(x=>x.chiNhanh===selStore);
-    return r;
-  }
-  const r26=getRowsCK(2026), r25=getRowsCK(2025);
-  const dt26=sumDT(r26), dt25=sumDT(r25);
-  const ln26=sumLN(r26), ln25=sumLN(r25);
-  const sl26=sumSL(r26), sl25=sumSL(r25);
-  const tsln26=calcTSLN(r26), tsln25=calcTSLN(r25);
-  function setKPI(id,v){document.getElementById(id).innerHTML=v;}
+  function setKPI(id,v){const el=document.getElementById(id);if(el)el.innerHTML=v;}
   function diffLbl(a,b,isMoney){
-    if(!b)return '';
+    if(!b) return '';
     const d=a-b,g=(a-b)/b;
     const sign=d>=0?'▲':'▼',cls=d>=0?'up':'dn';
     const fv=isMoney?fmtB(Math.abs(d)):(Math.abs(d).toFixed(0));
     return `<span class="${cls}">${sign} ${fv} (${pct(Math.abs(g))})</span>`;
   }
-  setKPI('yk_dt26',fmtB(dt26)); setKPI('yk_dt_d',diffLbl(dt26,dt25,true)); setKPI('yk_dt25',fmtB(dt25)); setKPI('yk_dt_pct','Cùng kỳ 2025');
-  setKPI('yk_ln26',fmtB(ln26)); setKPI('yk_ln_d',diffLbl(ln26,ln25,true)); setKPI('yk_ln25',fmtB(ln25)); setKPI('yk_ln_pct','Cùng kỳ 2025');
-  setKPI('yk_sl26',fmt(sl26)); setKPI('yk_sl_d',diffLbl(sl26,sl25,false)); setKPI('yk_sl25',fmt(sl25)); setKPI('yk_sl_pct','Cùng kỳ 2025');
-  setKPI('yk_tsln26',pct(tsln26)); setKPI('yk_tsln_d',diffLbl(tsln26*100,tsln25*100,false)+' pp'); setKPI('yk_tsln25',pct(tsln25)); setKPI('yk_tsln_pct','Cùng kỳ 2025');
+  setKPI('yk_dt26',fmtB(dtA)); setKPI('yk_dt_d',diffLbl(dtA,dtB,true));
+  setKPI('yk_dt25',fmtB(dtB)); setKPI('yk_dt_pct',`so với ${lblB}`);
+  setKPI('yk_ln26',fmtB(lnA)); setKPI('yk_ln_d',diffLbl(lnA,lnB,true));
+  setKPI('yk_ln25',fmtB(lnB)); setKPI('yk_ln_pct',`so với ${lblB}`);
+  setKPI('yk_sl26',fmt(slA)); setKPI('yk_sl_d',diffLbl(slA,slB,false));
+  setKPI('yk_sl25',fmt(slB)); setKPI('yk_sl_pct',`so với ${lblB}`);
+  setKPI('yk_tsln26',pct(tsA)); setKPI('yk_tsln_d',diffLbl(tsA*100,tsB*100,false)+' pp');
+  setKPI('yk_tsln25',pct(tsB)); setKPI('yk_tsln_pct',`so với ${lblB}`);
 
-  // Charts
-  const labels=cmpMonths.map(m=>MN[m]||('T'+m));
-  const dt26arr=cmpMonths.map(m=>sumDT(getRows(2026,m)));
-  const dt25arr=cmpMonths.map(m=>sumDT(getRows(2025,m)));
-  const ln26arr=cmpMonths.map(m=>sumLN(getRows(2026,m)));
-  const ln25arr=cmpMonths.map(m=>sumLN(getRows(2025,m)));
-  const sl26arr=cmpMonths.map(m=>sumSL(getRows(2026,m)));
-  const sl25arr=cmpMonths.map(m=>sumSL(getRows(2025,m)));
-  const growArr=cmpMonths.map((m,i)=>dt25arr[i]>0?(dt26arr[i]-dt25arr[i])/dt25arr[i]*100:null);
+  // For charts: use monthly breakdown within each period
+  // If both same type=month, compare same month across years
+  // Otherwise show monthly breakdown of each period
+  const msChart=typeA===typeB&&typeA!=='year'&&msA.length===msB.length ? msA :
+                msA.length>=msB.length ? msA : msB;
+  const labelsChart=typeA==='month'&&typeB==='month'?[`T${valA}`,`T${valB}`]:
+    msA.length>1&&msB.length>1 ? msA.map(m=>MN[m]||'T'+m) :
+    msA.map(m=>MN[m]||'T'+m);
 
-  const barOpts=(lbl25,lbl26)=>({
+  // Monthly data arrays for A and B (align by position if same length, else each period's months)
+  const dtAarr=msA.map(m=>sumDT(getRows(yearA,[m])));
+  const dtBarr=msB.map(m=>sumDT(getRows(yearB,[m])));
+  const lnAarr=msA.map(m=>sumLN(getRows(yearA,[m])));
+  const lnBarr=msB.map(m=>sumLN(getRows(yearB,[m])));
+  const slAarr=msA.map(m=>sumSL(getRows(yearA,[m])));
+  const slBarr=msB.map(m=>sumSL(getRows(yearB,[m])));
+
+  // For growth chart: compare same-position months
+  const labelsA=msA.map(m=>typeA==='year'?MN[m]:MN[m]||'T'+m);
+  const labelsB=msB.map(m=>typeB==='year'?MN[m]:MN[m]||'T'+m);
+  const growArr=dtAarr.map((a,i)=>dtBarr[i]>0?(a-dtBarr[i])/dtBarr[i]*100:null);
+
+  const barOptsY=(l1,l2)=>({
     responsive:true,maintainAspectRatio:false,
     plugins:{legend:{position:'top'},datalabels:{display:false}},
     scales:{y:{ticks:{callback:v=>fmtB(v)},grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}
   });
 
+  const t1=document.getElementById('yoyChTitle1'); if(t1)t1.textContent=`Doanh thu – ${lblA} vs ${lblB}`;
+  const t2=document.getElementById('yoyChTitle2'); if(t2)t2.textContent=`Lợi nhuận – ${lblA} vs ${lblB}`;
+  const t3=document.getElementById('yoyChTitle3'); if(t3)t3.textContent=`% Tăng trưởng DT (${lblA} vs ${lblB})`;
+  const t4=document.getElementById('yoyChTitle4'); if(t4)t4.textContent=`Số lượng – ${lblA} vs ${lblB}`;
+  const t5=document.getElementById('yoyChTitle5'); if(t5)t5.textContent=`Chi tiết so sánh – ${lblA} vs ${lblB}`;
+  const yst=document.getElementById('yoyStoreTitle'); if(yst)yst.textContent=`Top 15 Cửa hàng – ${lblA} vs ${lblB}`;
+
   dc('yoyDT');
   CH['yoyDT']=new Chart(document.getElementById('cYoyDT').getContext('2d'),{
     type:'bar',
-    data:{labels,datasets:[
-      {label:'2025',data:dt25arr,backgroundColor:'#94a3b855',borderColor:'#94a3b8',borderWidth:1,borderRadius:4},
-      {label:'2026',data:dt26arr,backgroundColor:'#2d9e5f99',borderColor:'#1a6b3c',borderWidth:1,borderRadius:4}
+    data:{labels:labelsA,datasets:[
+      {label:lblA,data:dtAarr,backgroundColor:'#3182ce99',borderColor:'#2563eb',borderWidth:1,borderRadius:4},
+      {label:lblB,data:dtBarr.length===dtAarr.length?dtBarr:[],backgroundColor:'#2d9e5f99',borderColor:'#1a6b3c',borderWidth:1,borderRadius:4}
     ]},
-    options:barOpts('2025','2026')
+    options:barOptsY(lblA,lblB)
   });
-
   dc('yoyLN');
   CH['yoyLN']=new Chart(document.getElementById('cYoyLN').getContext('2d'),{
     type:'bar',
-    data:{labels,datasets:[
-      {label:'2025',data:ln25arr,backgroundColor:'#94a3b855',borderColor:'#94a3b8',borderWidth:1,borderRadius:4},
-      {label:'2026',data:ln26arr,backgroundColor:'#f0a50099',borderColor:'#d69e2e',borderWidth:1,borderRadius:4}
+    data:{labels:labelsA,datasets:[
+      {label:lblA,data:lnAarr,backgroundColor:'#f0a50099',borderColor:'#d69e2e',borderWidth:1,borderRadius:4},
+      {label:lblB,data:lnBarr.length===lnAarr.length?lnBarr:[],backgroundColor:'#38a16999',borderColor:'#276749',borderWidth:1,borderRadius:4}
     ]},
-    options:barOpts('2025','2026')
+    options:barOptsY(lblA,lblB)
   });
-
   dc('yoySL');
   CH['yoySL']=new Chart(document.getElementById('cYoySL').getContext('2d'),{
     type:'bar',
-    data:{labels,datasets:[
-      {label:'2025',data:sl25arr,backgroundColor:'#94a3b855',borderColor:'#94a3b8',borderWidth:1,borderRadius:4},
-      {label:'2026',data:sl26arr,backgroundColor:'#3182ce99',borderColor:'#2563eb',borderWidth:1,borderRadius:4}
+    data:{labels:labelsA,datasets:[
+      {label:lblA,data:slAarr,backgroundColor:'#3182ce99',borderColor:'#2563eb',borderWidth:1,borderRadius:4},
+      {label:lblB,data:slBarr.length===slAarr.length?slBarr:[],backgroundColor:'#94a3b855',borderColor:'#94a3b8',borderWidth:1,borderRadius:4}
     ]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'top'},datalabels:{display:false}},scales:{y:{grid:{color:'#f0f0f0'}},x:{grid:{display:false}}}}
   });
-
   dc('yoyGrowth');
   CH['yoyGrowth']=new Chart(document.getElementById('cYoyGrowth').getContext('2d'),{
     type:'bar',
-    data:{labels,datasets:[{
+    data:{labels:labelsA,datasets:[{
       label:'% Tăng trưởng DT',
       data:growArr,
       backgroundColor:growArr.map(v=>v===null?'#ccc':v>=0?'#2d9e5f99':'#e53e3e99'),
@@ -1690,53 +1799,60 @@ function renderYoY(){
   });
 
   // Bảng chi tiết
+  function growthLbl(a,b){
+    if(!b) return a?'<span class="up">Mới</span>':'–';
+    const g=(a-b)/b;
+    return g>=0?`<span class="up">▲ ${pct(g)}</span>`:`<span class="dn">▼ ${pct(Math.abs(g))}</span>`;
+  }
   let tb='';
-  const rows_all26=getRows(2026,0), rows_all25=getRows(2025,0);
-  // Theo tháng (cùng kỳ)
-  cmpMonths.forEach(m=>{
-    const r6=getRows(2026,m), r5=getRows(2025,m);
-    const d6=sumDT(r6),d5=sumDT(r5),l6=sumLN(r6),l5=sumLN(r5),s6=sumSL(r6),s5=sumSL(r5);
+  const numRows=Math.max(msA.length,msB.length);
+  for(let i=0;i<numRows;i++){
+    const mA=msA[i],mB=msB[i];
+    const rowLbl=mA?(MN[mA]||'T'+mA):(MN[mB]||'T'+mB);
+    const d6=dtAarr[i]||0,d5=dtBarr[i]||0;
+    const l6=lnAarr[i]||0,l5=lnBarr[i]||0;
+    const s6=slAarr[i]||0,s5=slBarr[i]||0;
     tb+=`<tr>
-      <td style="font-weight:700">${MN[m]||'T'+m}</td>
+      <td style="font-weight:700">${rowLbl}</td>
       <td>${fmtB(d5)}</td><td style="font-weight:700">${fmtB(d6)}</td><td>${growthLbl(d6,d5)}</td>
       <td>${fmtB(l5)}</td><td style="font-weight:700">${fmtB(l6)}</td><td>${growthLbl(l6,l5)}</td>
       <td>${fmt(s5)}</td><td style="font-weight:700">${fmt(s6)}</td><td>${growthLbl(s6,s5)}</td>
     </tr>`;
-  });
-  // Dòng tổng Q1 (các tháng đang xét)
-  const tdt26=dt26arr.reduce((s,v)=>s+v,0), tdt25=dt25arr.reduce((s,v)=>s+v,0);
-  const tln26=ln26arr.reduce((s,v)=>s+v,0), tln25=ln25arr.reduce((s,v)=>s+v,0);
-  const tsl26=sl26arr.reduce((s,v)=>s+v,0), tsl25=sl25arr.reduce((s,v)=>s+v,0);
-  const period_lbl=selM>0?('Tháng '+selM):(cmpMonths.length<=3?'Q'+Math.ceil(cmpMonths[0]/3):'Cả năm');
+  }
+  // Tổng
   tb+=`<tr style="background:#f0f7f3;font-weight:700">
-    <td>${period_lbl} (Tổng)</td>
-    <td>${fmtB(tdt25)}</td><td>${fmtB(tdt26)}</td><td>${growthLbl(tdt26,tdt25)}</td>
-    <td>${fmtB(tln25)}</td><td>${fmtB(tln26)}</td><td>${growthLbl(tln26,tln25)}</td>
-    <td>${fmt(tsl25)}</td><td>${fmt(tsl26)}</td><td>${growthLbl(tsl26,tsl25)}</td>
+    <td>Tổng</td>
+    <td>${fmtB(dtB)}</td><td>${fmtB(dtA)}</td><td>${growthLbl(dtA,dtB)}</td>
+    <td>${fmtB(lnB)}</td><td>${fmtB(lnA)}</td><td>${growthLbl(lnA,lnB)}</td>
+    <td>${fmt(slB)}</td><td>${fmt(slA)}</td><td>${growthLbl(slA,slB)}</td>
   </tr>`;
   document.getElementById('yoyTbody').innerHTML=tb;
 
-  // Top stores comparison
+  // Update table header to show A/B labels
+  const thead=document.querySelector('#page-yoy table thead tr');
+  if(thead) thead.innerHTML=`<th>Kỳ</th><th>${lblB} DT</th><th>${lblA} DT</th><th>Tăng trưởng DT</th><th>${lblB} LN</th><th>${lblA} LN</th><th>Tăng trưởng LN</th><th>${lblB} SL</th><th>${lblA} SL</th><th>Tăng trưởng SL</th>`;
+
+  // Top stores
   const storeSet=new Set([
-    ...D_ALL.filter(r=>r.nam===2026).map(r=>r.chiNhanh),
-    ...D_ALL.filter(r=>r.nam===2025).map(r=>r.chiNhanh)
+    ...D_ALL.filter(r=>r.nam===yearA&&msA.includes(r.thang)).map(r=>r.chiNhanh),
+    ...D_ALL.filter(r=>r.nam===yearB&&msB.includes(r.thang)).map(r=>r.chiNhanh)
   ]);
   const storeData=[];
   storeSet.forEach(s=>{
-    const d6=sumDT(getRows(2026,selM).filter(r=>r.chiNhanh===s));
-    const d5=sumDT(getRows(2025,selM).filter(r=>r.chiNhanh===s));
-    if(d6>0||d5>0) storeData.push({s,d6,d5});
+    const dA=sumDT(getRows(yearA,msA).filter(r=>r.chiNhanh===s));
+    const dB=sumDT(getRows(yearB,msB).filter(r=>r.chiNhanh===s));
+    if(dA>0||dB>0) storeData.push({s,dA,dB});
   });
-  storeData.sort((a,b)=>b.d6-a.d6);
+  storeData.sort((a,b)=>b.dA-a.dA);
   const top15=storeData.slice(0,15);
   dc('yoyStore');
   CH['yoyStore']=new Chart(document.getElementById('cYoyStore').getContext('2d'),{
     type:'bar',
     data:{
-      labels:top15.map(x=>x.s.replace(/PHUCTEA\d+ - /,'')),
+      labels:top15.map(x=>x.s.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'').slice(0,22)),
       datasets:[
-        {label:'2025',data:top15.map(x=>x.d5),backgroundColor:'#94a3b855',borderColor:'#94a3b8',borderWidth:1,borderRadius:3},
-        {label:'2026',data:top15.map(x=>x.d6),backgroundColor:'#2d9e5f99',borderColor:'#1a6b3c',borderWidth:1,borderRadius:3}
+        {label:lblB,data:top15.map(x=>x.dB),backgroundColor:'#94a3b855',borderColor:'#94a3b8',borderWidth:1,borderRadius:3},
+        {label:lblA,data:top15.map(x=>x.dA),backgroundColor:'#2d9e5f99',borderColor:'#1a6b3c',borderWidth:1,borderRadius:3}
       ]
     },
     options:{
@@ -1885,8 +2001,8 @@ function renderBOD(){
   // Thu hồi Công nợ
   document.getElementById('bodCNsub').textContent=`Dữ liệu đến ${lastDateStr}`;
   // F:G = Tổng thu CN tháng (đã được cache vào cn_tt_raw sau khi applyCNToKPI chạy)
-  const cn_tong_m = _kpiCache['cn_tt_raw_'+lastMonth]||0;
-  const cn_tong_y = Array.from({length:12},(_,i)=>_kpiCache['cn_tt_raw_'+(i+1)]||0).reduce((s,v)=>s+v,0);
+  const cn_tong_m = _cnBH['2026-'+lastMonth]||0;
+  const cn_tong_y = Array.from({length:12},(_,i)=>_cnBH['2026-'+(i+1)]||0).reduce((s,v)=>s+v,0);
   // J:K = Công nợ cũ đã thu
   const cn_cu_m = _cnKPI['2026-'+lastMonth]||0;
   const cn_cu_y = Array.from({length:12},(_,i)=>_cnKPI['2026-'+(i+1)]||0).reduce((s,v)=>s+v,0);
@@ -2442,7 +2558,7 @@ function recalcKPI(){
 
 // ===== KHỞI TẠO RENDER =====
 applyF();
-fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFilter();});
+fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFilter();initYoYFilters();});
 </script>
 </body>
 </html>
