@@ -87,6 +87,12 @@ tr:last-child td{border-bottom:none}
 .info-box{background:#ebf8ff;border:1px solid #bee3f8;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:12px;color:#2b6cb0}
 @media(max-width:1200px){.kgrid{grid-template-columns:repeat(3,1fr)}.row2{grid-template-columns:1fr}.cgrid{grid-template-columns:1fr}.miss-kpi{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:768px){.kgrid{grid-template-columns:repeat(2,1fr)}.row22{grid-template-columns:1fr}.main{padding:10px}}
+.kbadge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:5px}
+.kb-g{background:#e8f5ee;color:#1a6b3c}.kb-y{background:#fff8e6;color:#7a5800}.kb-r{background:#fff0f0;color:#c53030}.kb-x{background:#f2f2f2;color:#888}
+.ov-mnav{display:flex;align-items:center;gap:8px;margin-bottom:14px;background:#fff;border-radius:10px;padding:10px 14px;box-shadow:var(--sh);flex-wrap:wrap}
+.ov-mnav-btn{border:1px solid var(--bdr);background:#fff;color:var(--g);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;transition:all .15s;line-height:1.4}
+.ov-mnav-btn:hover,.ov-mnav-btn.today{background:var(--g);color:#fff;border-color:var(--g)}
+.ov-mnav-label{font-size:17px;font-weight:800;color:var(--g);min-width:100px;text-align:center}
 @media print{.filters,.tabs{display:none!important}.page{display:block!important}body{background:#fff}}
 
 .kpi-tab-wrap{overflow-x:auto}
@@ -235,13 +241,22 @@ tr:last-child td{border-bottom:none}
 
 <!-- TỔNG QUAN -->
 <div class="page on" id="page-ov">
+  <!-- Quick month navigator -->
+  <div class="ov-mnav" id="ovMNav">
+    <button class="ov-mnav-btn" onclick="ovNavMonth(-1)">◀ Trước</button>
+    <span class="ov-mnav-label" id="ovMNavLabel">–</span>
+    <button class="ov-mnav-btn" onclick="ovNavMonth(1)">Sau ▶</button>
+    <div style="width:1px;background:var(--bdr);height:20px;margin:0 4px;flex-shrink:0"></div>
+    <button class="ov-mnav-btn" id="ovMNavTodayBtn" onclick="ovNavToday()">Tháng này</button>
+    <div style="margin-left:auto;font-size:11px;color:var(--muted)" id="ovMNavSub"></div>
+  </div>
   <div class="kgrid">
-    <div class="kc gr"><div class="klbl">Doanh Thu</div><div class="kval" id="k0">–</div><div class="ksub" id="k0s"></div></div>
-    <div class="kc go"><div class="klbl">Số Lượng Bán</div><div class="kval" id="k1">–</div><div class="ksub" id="k1s"></div></div>
-    <div class="kc bl"><div class="klbl">Lợi Nhuận</div><div class="kval" id="k2">–</div><div class="ksub" id="k2s"></div></div>
-    <div class="kc gr"><div class="klbl">Biên LN / DT</div><div class="kval" id="k3">–</div><div class="ksub" id="k3s">Tỷ suất lợi nhuận</div></div>
-    <div class="kc rd"><div class="klbl">Giảm Giá</div><div class="kval" id="k4">–</div><div class="ksub" id="k4s"></div></div>
-    <div class="kc bl"><div class="klbl">Cửa Hàng HĐ</div><div class="kval" id="k5">–</div><div class="ksub" id="k5s"></div></div>
+    <div class="kc gr"><div class="klbl">Doanh Thu</div><div class="kval" id="k0">–</div><div id="k0b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k0s"></div></div>
+    <div class="kc go"><div class="klbl">Số Lượng Bán</div><div class="kval" id="k1">–</div><div id="k1b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k1s"></div></div>
+    <div class="kc bl"><div class="klbl">Lợi Nhuận</div><div class="kval" id="k2">–</div><div id="k2b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k2s"></div></div>
+    <div class="kc gr"><div class="klbl">Biên LN / DT</div><div class="kval" id="k3">–</div><div id="k3b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k3s">Tỷ suất lợi nhuận</div></div>
+    <div class="kc rd"><div class="klbl">Giảm Giá</div><div class="kval" id="k4">–</div><div id="k4b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k4s"></div></div>
+    <div class="kc bl"><div class="klbl">Cửa Hàng HĐ</div><div class="kval" id="k5">–</div><div id="k5b" class="kbadge kb-x" style="display:none"></div><div class="ksub" id="k5s"></div></div>
   </div>
   <div class="row2">
     <div class="cc">
@@ -963,7 +978,7 @@ async function fetchSalesFromSheet(){
     updateMonthDropdown();
 
     // Re-render toàn bộ dashboard
-    applyF();
+    if(!_ovDefaulted){defaultToCurrentMonth();}else{applyF();}
     if(typeof updateMissMonths==='function') updateMissMonths();
     const ap=document.querySelector('.page.on');
     if(ap){
@@ -1160,6 +1175,21 @@ function renderKPI(){
   k0.innerHTML=fmtB(dt);k1.innerHTML=fmt(Math.round(sl));k2.innerHTML=fmtB(ln);
   k3.innerHTML=pct(mg);k4.innerHTML=fmtB(gg);k5.innerHTML=ch+' CH';
   k3.style.color=mg>=.3?'#2d9e5f':mg>=.2?'#d69e2e':'#e53e3e';
+  // --- Badges ---
+  const _selM=parseInt(document.getElementById('fMonth')?.value||0);
+  function _badge(id,txt,cls){const e=document.getElementById(id);if(!e)return;e.textContent=txt;e.className='kbadge '+cls;e.style.display='inline-block';}
+  function _hideBadge(id){const e=document.getElementById(id);if(e)e.style.display='none';}
+  // DT vs KH
+  const _dtKH=_selM&&_kpiCache['dt_bh_kh_'+_selM]?_kpiCache['dt_bh_kh_'+_selM]:null;
+  if(_dtKH&&dt){const r=dt/_dtKH;_badge('k0b',(r>=1?'✅ ':'⚠️ ')+(r*100).toFixed(0)+'% vs KH',r>=1?'kb-g':r>=.8?'kb-y':'kb-r');}else _hideBadge('k0b');
+  // LN vs KH
+  const _lnKH=_selM&&_kpiCache['ln_kh_'+_selM]?_kpiCache['ln_kh_'+_selM]:null;
+  if(_lnKH&&ln){const r=ln/_lnKH;_badge('k2b',(r>=1?'✅ ':'⚠️ ')+(r*100).toFixed(0)+'% vs KH',r>=1?'kb-g':r>=.8?'kb-y':'kb-r');}else _hideBadge('k2b');
+  // TSLN vs KH
+  const _tslnKH=_selM&&_kpiCache['tsln_kh_'+_selM]!=null?_kpiCache['tsln_kh_'+_selM]:null;
+  if(_tslnKH!=null){const r=mg*100/_tslnKH;_badge('k3b','KH: '+_tslnKH.toFixed(1)+'%',r>=1?'kb-g':r>=.8?'kb-y':'kb-r');}else _hideBadge('k3b');
+  // SL, GG, CH — hide badges (no KH for these)
+  _hideBadge('k1b');_hideBadge('k4b');_hideBadge('k5b');
 }
 
 // ===== XU HƯỚNG =====
@@ -1175,12 +1205,18 @@ function renderTrend(){
   const vals=lbls.map(l=>gr[l][tM]);
   const lM={dt:'Doanh thu',ln:'Lợi nhuận',sl:'Số lượng'};
   const cM={dt:'#1a6b3c',ln:'#3182ce',sl:'#f0a500'};
+  // Build datasets — add KH target line for DT monthly view
+  const _trendDS=[{label:lM[tM],data:vals,borderColor:cM[tM],backgroundColor:cM[tM]+'22',borderWidth:2.5,pointRadius:g==='day'?2:5,pointBackgroundColor:cM[tM],fill:true,tension:.3}];
+  if(tM==='dt'&&g==='month'){
+    const _khVals=lbls.map(l=>{const mk=Object.entries(MN).find(([,v])=>v===l);return mk?(_kpiCache['dt_bh_kh_'+mk[0]]||null):null;});
+    if(_khVals.some(v=>v!==null)) _trendDS.push({label:'Mục tiêu DT',data:_khVals,borderColor:'#f0a500',borderDash:[6,4],borderWidth:2,pointRadius:4,pointStyle:'triangle',fill:false,tension:.3,backgroundColor:'transparent'});
+  }
   dc('tr');
   CH['tr']=new Chart(document.getElementById('cTrend').getContext('2d'),{
     type:'line',
-    data:{labels:lbls,datasets:[{label:lM[tM],data:vals,borderColor:cM[tM],backgroundColor:cM[tM]+'22',borderWidth:2.5,pointRadius:g==='day'?2:5,pointBackgroundColor:cM[tM],fill:true,tension:.3}]},
+    data:{labels:lbls,datasets:_trendDS},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{display:false},datalabels:{display:false}},
+      plugins:{legend:{display:_trendDS.length>1,labels:{font:{size:11},boxWidth:14}},datalabels:{display:false}},
       scales:{y:{ticks:{callback:v=>fmtB(v)},grid:{color:'#f0f0f0'}},x:{grid:{display:false},ticks:{maxRotation:45}}}}
   });
 }
@@ -2233,6 +2269,65 @@ function copyBOD(){
 }
 
 // ===== ĐIỀU HƯỚNG TAB =====
+// ===== OVERVIEW MONTH NAV =====
+let _ovDefaulted=false;
+function ovNavMonth(delta){
+  const yEl=document.getElementById('fYear');
+  const mEl=document.getElementById('fMonth');
+  let y=parseInt(yEl?.value)||2026;
+  let m=parseInt(mEl?.value)||new Date().getMonth()+1;
+  m+=delta;
+  if(m>12){m=1;y++;}
+  if(m<1){m=12;y--;}
+  if(yEl) yEl.value=y;
+  D_CY=D_ALL.filter(r=>r.nam===y);
+  if(typeof buildFilters==='function') buildFilters();
+  if(typeof updateMonthDropdown==='function') updateMonthDropdown();
+  if(mEl) mEl.value=m;
+  if(typeof onMonthChange==='function') onMonthChange();
+  updateOvMNav();
+}
+function ovNavToday(){
+  const now=new Date();
+  const yEl=document.getElementById('fYear');
+  const mEl=document.getElementById('fMonth');
+  if(yEl) yEl.value=now.getFullYear();
+  D_CY=D_ALL.filter(r=>r.nam===now.getFullYear());
+  if(typeof buildFilters==='function') buildFilters();
+  if(typeof updateMonthDropdown==='function') updateMonthDropdown();
+  if(mEl) mEl.value=now.getMonth()+1;
+  if(typeof onMonthChange==='function') onMonthChange();
+  updateOvMNav();
+}
+function updateOvMNav(){
+  const m=parseInt(document.getElementById('fMonth')?.value||0);
+  const y=parseInt(document.getElementById('fYear')?.value||2026);
+  const lbl=document.getElementById('ovMNavLabel');
+  if(lbl) lbl.textContent=m?`T${m} / ${y}`:'Tất cả tháng';
+  const now=new Date();
+  const isCur=m===now.getMonth()+1&&y===now.getFullYear();
+  const sub=document.getElementById('ovMNavSub');
+  if(sub) sub.innerHTML=isCur?'<span style="color:#1a6b3c;font-weight:700">● Tháng hiện tại</span>':'';
+  const todayBtn=document.getElementById('ovMNavTodayBtn');
+  if(todayBtn) todayBtn.classList.toggle('today',isCur);
+}
+function defaultToCurrentMonth(){
+  if(_ovDefaulted) return;
+  _ovDefaulted=true;
+  const now=new Date();
+  const yEl=document.getElementById('fYear');
+  const mEl=document.getElementById('fMonth');
+  if(!yEl||!mEl) return;
+  yEl.value=now.getFullYear();
+  D_CY=D_ALL.filter(r=>r.nam===now.getFullYear());
+  if(typeof buildFilters==='function') buildFilters();
+  if(typeof updateMonthDropdown==='function') updateMonthDropdown();
+  const curM=now.getMonth()+1;
+  const opt=[...mEl.options].find(o=>parseInt(o.value)===curM);
+  if(opt){mEl.value=curM;if(typeof onMonthChange==='function') onMonthChange();}
+  updateOvMNav();
+}
+
 function setWeekThis(){
   const now=new Date();
   const d=now.getDay();
