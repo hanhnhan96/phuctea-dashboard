@@ -232,6 +232,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab on" onclick="showTab('ov',this)">🏠 Tổng quan</div>
   <div class="tab" onclick="showTab('week',this)">📅 Báo cáo Tuần</div>
   <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo BOD</div>
+  <div class="tab" onclick="showTab('order',this)">🚚 Theo dõi Đơn</div>
   <div class="tab-sep"></div>
   <div class="tab" onclick="showTab('cmp',this)">So sánh tháng</div>
   <div class="tab" onclick="showTab('st',this)">Cửa hàng</div>
@@ -565,6 +566,51 @@ tr:last-child td{border-bottom:none}
 </div>
 </div>
 
+<!-- THEO DÕI ĐƠN HÀNG -->
+<div class="page" id="page-order">
+  <p class="stitle">🚚 Theo dõi Đơn hàng</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+    <div class="fg"><label>Thương hiệu</label>
+      <select id="ordBrand" onchange="renderOrderTrack()" class="filter-sel">
+        <option value="">Tất cả</option>
+        <option value="PHÚC TEA">PHÚC TEA</option>
+        <option value="THE HOA">THE HOA</option>
+      </select>
+    </div>
+    <div class="fg"><label>Trạng thái</label>
+      <select id="ordStatus" onchange="renderOrderTrack()" class="filter-sel">
+        <option value="">Tất cả</option>
+        <option value="urgent">🔴 Quá 7 ngày</option>
+        <option value="warn">🟡 Quá 5 ngày</option>
+        <option value="ok">🟢 Đang xử lý</option>
+        <option value="sent">✅ Đã gửi hàng</option>
+      </select>
+    </div>
+    <div class="fg"><label>Từ ngày</label><input type="date" id="ordFrom" onchange="renderOrderTrack()" class="filter-sel"></div>
+    <div class="fg"><label>Đến ngày</label><input type="date" id="ordTo" onchange="renderOrderTrack()" class="filter-sel"></div>
+    <button class="btn btn2" onclick="ordReset()">Đặt lại</button>
+  </div>
+  <div id="ordAlerts" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px"></div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th style="text-align:left">#</th>
+        <th style="text-align:left">Cửa hàng</th>
+        <th>Ngày nhận đơn</th>
+        <th>Ngày gửi hàng</th>
+        <th>Số ngày chờ</th>
+        <th style="text-align:right">Tổng đơn (đ)</th>
+        <th>Số SP</th>
+        <th>Trạng thái</th>
+      </tr></thead>
+      <tbody id="ordTbody"></tbody>
+    </table>
+  </div>
+  <div style="margin-top:10px;font-size:11px;color:#aaa">
+    💡 Cập nhật ngày gửi hàng: thêm cột <b>"NGÀY GỬI HÀNG"</b> vào sheet 2026 (cột G) và nhập ngày theo định dạng <b>dd/MM/yyyy</b>
+  </div>
+</div>
+
 <!-- BÁO CÁO TUẦN -->
 <div class="page" id="page-week">
   <p class="stitle">📅 Báo cáo Tuần</p>
@@ -874,7 +920,8 @@ const SALES_COL_MAP = {
   'TỔNG THÀNH TIỀN':         'tongThanhTien',
   'TỔNG GIÁ VỐN':            'tongGiaVon',
   'TỔNG GIÁ TRỊ LỢI NHUẬN': 'tongLoiNhuan',
-  'TSLN TRÊN DT':            'tsln'          // "13,75%" → 0.1375
+  'TSLN TRÊN DT':            'tsln',         // "13,75%" → 0.1375
+  'NGÀY GỬI HÀNG':          'ngayGuiHang'   // dd/MM/yyyy → yyyy-MM-dd (cột G sheet 2026)
 };
 const _SALES_NUM = new Set(['thang','sl','thanhTien','tongGiamGia','tongThanhTien','tongGiaVon','tongLoiNhuan','tsln']);
 
@@ -953,8 +1000,8 @@ async function fetchSalesFromSheet(){
         headers.forEach((field,j)=>{
           if(!field) return;
           const raw=(r[j]||'').trim();
-          if(field==='ngay'){
-            obj.ngay=parseSalesDate(raw);
+          if(field==='ngay'||field==='ngayGuiHang'){
+            obj[field]=parseSalesDate(raw);
           } else if(_SALES_NUM.has(field)){
             obj[field]=parseSalesNum(raw);
           } else {
@@ -2388,6 +2435,83 @@ function defaultToCurrentMonth(){
   updateOvMNav();
 }
 
+// ===== THEO DÕI ĐƠN HÀNG =====
+function ordReset(){
+  ['ordBrand','ordStatus','ordFrom','ordTo'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  renderOrderTrack();
+}
+function renderOrderTrack(){
+  const brand=document.getElementById('ordBrand')?.value||'';
+  const statusF=document.getElementById('ordStatus')?.value||'';
+  const from=document.getElementById('ordFrom')?.value||'';
+  const to=document.getElementById('ordTo')?.value||'';
+  const today=new Date();today.setHours(0,0,0,0);
+  // Nhóm theo cửa hàng + ngày → 1 đơn
+  const map={};
+  D_ALL.forEach(r=>{
+    if(!r.ngay||!r.chiNhanh) return;
+    if(brand&&r.brand!==brand) return;
+    const ng=r.ngay.slice(0,10);
+    if(from&&ng<from) return;
+    if(to&&ng>to) return;
+    const k=r.chiNhanh+'__'+ng;
+    if(!map[k]) map[k]={chiNhanh:r.chiNhanh,brand:r.brand,ngay:ng,ngayGui:'',tongDT:0,soSP:0};
+    const o=map[k];
+    o.tongDT+=(r.thanhTien||0);
+    o.soSP++;
+    if(!o.ngayGui&&r.ngayGuiHang) o.ngayGui=r.ngayGuiHang.slice(0,10);
+  });
+  // Tính trạng thái
+  const orders=Object.values(map).map(o=>{
+    const d=new Date(o.ngay);d.setHours(0,0,0,0);
+    o.daysWait=Math.max(0,Math.floor((today-d)/86400000));
+    o.code=o.ngayGui?'sent':o.daysWait>7?'urgent':o.daysWait>5?'warn':'ok';
+    return o;
+  });
+  // Summary chips
+  const cnt={urgent:0,warn:0,ok:0,sent:0};
+  orders.forEach(o=>cnt[o.code]++);
+  const chip=(t,bg,cl)=>`<span style="background:${bg};color:${cl};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">${t}</span>`;
+  let ha='';
+  if(cnt.urgent)ha+=chip(`🔴 ${cnt.urgent} đơn quá 7 ngày chưa gửi`,'#fff0f0','#c53030')+' ';
+  if(cnt.warn)ha+=chip(`🟡 ${cnt.warn} đơn quá 5 ngày chưa gửi`,'#fff8e6','#7a5800')+' ';
+  if(cnt.ok)ha+=chip(`🟢 ${cnt.ok} đơn đang xử lý`,'#e8f5ee','#1a6b3c')+' ';
+  if(cnt.sent)ha+=chip(`✅ ${cnt.sent} đơn đã gửi`,'#ebf8ff','#2b6cb0');
+  const alEl=document.getElementById('ordAlerts');
+  if(alEl) alEl.innerHTML=ha||'<span style="color:#aaa;font-size:12px">Không có dữ liệu trong khoảng đã chọn</span>';
+  // Lọc theo status
+  let show=statusF?orders.filter(o=>o.code===statusF):orders;
+  // Sắp xếp: khẩn cấp → cảnh báo → đang xử lý → đã gửi, trong nhóm thì chờ lâu nhất lên trước
+  const pr={urgent:0,warn:1,ok:2,sent:3};
+  show.sort((a,b)=>(pr[a.code]-pr[b.code])||b.daysWait-a.daysWait);
+  const slBadge={
+    urgent:'<span style="background:#fff0f0;color:#c53030;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🔴 Quá 7 ngày</span>',
+    warn:'<span style="background:#fff8e6;color:#7a5800;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🟡 Quá 5 ngày</span>',
+    ok:'<span style="background:#e8f5ee;color:#1a6b3c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🟢 Đang xử lý</span>',
+    sent:'<span style="background:#ebf8ff;color:#2b6cb0;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">✅ Đã gửi</span>'
+  };
+  let tb='';
+  if(!show.length){
+    tb='<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">Không có đơn hàng nào phù hợp</td></tr>';
+  } else {
+    show.forEach((o,i)=>{
+      const rb=o.code==='urgent'?'background:#fff8f8':o.code==='warn'?'background:#fffdf0':'';
+      const sn=o.chiNhanh.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
+      tb+=`<tr style="${rb}">
+        <td>${i+1}</td>
+        <td style="font-weight:600">${sn}<br><span style="font-size:10px;color:#aaa">${o.chiNhanh}</span></td>
+        <td style="text-align:center">${o.ngay}</td>
+        <td style="text-align:center">${o.ngayGui||'<span style="color:#bbb">–</span>'}</td>
+        <td style="text-align:center;font-weight:700;color:${o.code==='urgent'?'#c53030':o.code==='warn'?'#7a5800':o.code==='sent'?'#2b6cb0':'#1a6b3c'}">${o.code==='sent'?'–':o.daysWait+' ngày'}</td>
+        <td style="text-align:right;font-weight:700">${fmtB(o.tongDT)}</td>
+        <td style="text-align:center">${o.soSP}</td>
+        <td>${slBadge[o.code]||''}</td>
+      </tr>`;
+    });
+  }
+  document.getElementById('ordTbody').innerHTML=tb;
+}
+
 function setWeekThis(){
   const now=new Date();
   const d=now.getDay();
@@ -2509,6 +2633,7 @@ function showTab(name,el){
   if(name==='pd')renderPdPage();
   if(name==='miss')renderMissPage();
   if(name==='week'){setWeek7d();}
+  if(name==='order')renderOrderTrack();
   if(name==='yoy')renderYoY();
   if(name==='kpi'){loadKPI();fetchKPIFromSheet().then(()=>recalcKPI());}
   if(name==='bod'){loadKPI();renderBOD();}
