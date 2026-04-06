@@ -577,6 +577,14 @@ tr:last-child td{border-bottom:none}
         <option value="THE HOA">THE HOA</option>
       </select>
     </div>
+    <div class="fg"><label>Loại đơn</label>
+      <select id="ordType" onchange="renderOrderTrack()" class="filter-sel">
+        <option value="">Tất cả</option>
+        <option value="nl">Nguyên liệu & NL ĐQ</option>
+        <option value="vl">Vật liệu & VL ĐQ</option>
+        <option value="ht">Hệ Thống</option>
+      </select>
+    </div>
     <div class="fg"><label>Trạng thái</label>
       <select id="ordStatus" onchange="renderOrderTrack()" class="filter-sel">
         <option value="">Tất cả</option>
@@ -596,6 +604,7 @@ tr:last-child td{border-bottom:none}
       <thead><tr>
         <th style="text-align:left">#</th>
         <th style="text-align:left">Cửa hàng</th>
+        <th>Loại đơn</th>
         <th>Ngày nhận đơn</th>
         <th>Ngày gửi hàng</th>
         <th>Số ngày chờ</th>
@@ -2436,17 +2445,32 @@ function defaultToCurrentMonth(){
 }
 
 // ===== THEO DÕI ĐƠN HÀNG =====
+// Phân loại loaiHang → 3 nhóm đơn
+function getOrdType(lh){
+  if(!lh) return null;
+  const u=lh.toUpperCase().trim();
+  if(u.includes('NGUYÊN LIỆU')||u.includes('NL ĐỘC QUYỀN')||u==='NL'||u==='NL ĐQ'||u.startsWith('NL ')) return 'nl';
+  if(u.includes('VẬT LIỆU')||u.includes('VL ĐỘC QUYỀN')||u==='VL'||u==='VL ĐQ'||u.startsWith('VL ')) return 'vl';
+  if(u.includes('HỆ THỐNG')||u==='HT'||u.startsWith('HT ')) return 'ht';
+  return null; // không thuộc 3 nhóm → bỏ qua
+}
+const ORD_TYPE_LABEL={
+  nl:{label:'Nguyên liệu & NL ĐQ', bg:'#e8f5ee', cl:'#1a6b3c'},
+  vl:{label:'Vật liệu & VL ĐQ',    bg:'#fff8e6', cl:'#7a5800'},
+  ht:{label:'Hệ Thống',             bg:'#ebf8ff', cl:'#2b6cb0'}
+};
 function ordReset(){
-  ['ordBrand','ordStatus','ordFrom','ordTo'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
+  ['ordBrand','ordStatus','ordFrom','ordTo','ordType'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   renderOrderTrack();
 }
 function renderOrderTrack(){
   const brand=document.getElementById('ordBrand')?.value||'';
   const statusF=document.getElementById('ordStatus')?.value||'';
+  const typeF=document.getElementById('ordType')?.value||'';
   const from=document.getElementById('ordFrom')?.value||'';
   const to=document.getElementById('ordTo')?.value||'';
   const today=new Date();today.setHours(0,0,0,0);
-  // Nhóm theo cửa hàng + ngày → 1 đơn
+  // Nhóm theo cửa hàng + ngày + loại đơn
   const map={};
   D_ALL.forEach(r=>{
     if(!r.ngay||!r.chiNhanh) return;
@@ -2454,14 +2478,16 @@ function renderOrderTrack(){
     const ng=r.ngay.slice(0,10);
     if(from&&ng<from) return;
     if(to&&ng>to) return;
-    const k=r.chiNhanh+'__'+ng;
-    if(!map[k]) map[k]={chiNhanh:r.chiNhanh,brand:r.brand,ngay:ng,ngayGui:'',tongDT:0,soSP:0};
+    const ot=getOrdType(r.loaiHang);
+    if(!ot) return; // bỏ qua danh mục không thuộc 3 nhóm
+    const k=r.chiNhanh+'__'+ng+'__'+ot;
+    if(!map[k]) map[k]={chiNhanh:r.chiNhanh,brand:r.brand,ngay:ng,ordType:ot,ngayGui:'',tongDT:0,soSP:0};
     const o=map[k];
     o.tongDT+=(r.thanhTien||0);
     o.soSP++;
     if(!o.ngayGui&&r.ngayGuiHang) o.ngayGui=r.ngayGuiHang.slice(0,10);
   });
-  // Tính trạng thái
+  // Tính trạng thái từng đơn
   const orders=Object.values(map).map(o=>{
     const d=new Date(o.ngay);d.setHours(0,0,0,0);
     o.daysWait=Math.max(0,Math.floor((today-d)/86400000));
@@ -2479,11 +2505,13 @@ function renderOrderTrack(){
   if(cnt.sent)ha+=chip(`✅ ${cnt.sent} đơn đã gửi`,'#ebf8ff','#2b6cb0');
   const alEl=document.getElementById('ordAlerts');
   if(alEl) alEl.innerHTML=ha||'<span style="color:#aaa;font-size:12px">Không có dữ liệu trong khoảng đã chọn</span>';
-  // Lọc theo status
-  let show=statusF?orders.filter(o=>o.code===statusF):orders;
-  // Sắp xếp: khẩn cấp → cảnh báo → đang xử lý → đã gửi, trong nhóm thì chờ lâu nhất lên trước
+  // Lọc
+  let show=orders;
+  if(statusF) show=show.filter(o=>o.code===statusF);
+  if(typeF) show=show.filter(o=>o.ordType===typeF);
+  // Sắp xếp: urgent→warn→ok→sent, rồi ngày chờ lâu nhất, rồi cửa hàng
   const pr={urgent:0,warn:1,ok:2,sent:3};
-  show.sort((a,b)=>(pr[a.code]-pr[b.code])||b.daysWait-a.daysWait);
+  show.sort((a,b)=>(pr[a.code]-pr[b.code])||b.daysWait-a.daysWait||(a.chiNhanh>b.chiNhanh?1:-1));
   const slBadge={
     urgent:'<span style="background:#fff0f0;color:#c53030;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🔴 Quá 7 ngày</span>',
     warn:'<span style="background:#fff8e6;color:#7a5800;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🟡 Quá 5 ngày</span>',
@@ -2492,14 +2520,16 @@ function renderOrderTrack(){
   };
   let tb='';
   if(!show.length){
-    tb='<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">Không có đơn hàng nào phù hợp</td></tr>';
+    tb='<tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px">Không có đơn hàng nào phù hợp</td></tr>';
   } else {
     show.forEach((o,i)=>{
       const rb=o.code==='urgent'?'background:#fff8f8':o.code==='warn'?'background:#fffdf0':'';
       const sn=o.chiNhanh.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
+      const tl=ORD_TYPE_LABEL[o.ordType]||{label:o.ordType,bg:'#f5f5f5',cl:'#555'};
       tb+=`<tr style="${rb}">
         <td>${i+1}</td>
         <td style="font-weight:600">${sn}<br><span style="font-size:10px;color:#aaa">${o.chiNhanh}</span></td>
+        <td><span style="background:${tl.bg};color:${tl.cl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${tl.label}</span></td>
         <td style="text-align:center">${o.ngay}</td>
         <td style="text-align:center">${o.ngayGui||'<span style="color:#bbb">–</span>'}</td>
         <td style="text-align:center;font-weight:700;color:${o.code==='urgent'?'#c53030':o.code==='warn'?'#7a5800':o.code==='sent'?'#2b6cb0':'#1a6b3c'}">${o.code==='sent'?'–':o.daysWait+' ngày'}</td>
