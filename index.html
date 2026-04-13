@@ -175,11 +175,14 @@ tr:last-child td{border-bottom:none}
 @media print{
   .hdr,.filters,.tabs,.stitle,.no-print{display:none!important}
   .page{display:block!important}
-  body:not(.printing-week) .page:not(#page-bod){display:none!important}
+  body:not(.printing-week):not(.printing-bod) .page:not(#page-bod){display:none!important}
   body.printing-week .page:not(#page-week){display:none!important}
+  body.printing-bod .page:not(#page-bod){display:none!important}
   body{background:white}
   .bod-section{box-shadow:none;border:1px solid #ddd}
   body.printing-week #page-week{padding:0!important}
+  body.printing-bod #page-bod{padding:0!important}
+  body.printing-bod .bod-header-bar .no-print{display:none!important}
   .week-print-header{display:block!important}
 }
 .week-print-header{display:none}
@@ -231,7 +234,7 @@ tr:last-child td{border-bottom:none}
 <div class="tabs">
   <div class="tab on" onclick="showTab('ov',this)">🏠 Tổng quan</div>
   <div class="tab" onclick="showTab('week',this)">📅 Báo cáo Tuần</div>
-  <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo BOD</div>
+  <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo Chuỗi</div>
   <div class="tab" onclick="showTab('order',this)">🚚 Theo dõi Đơn</div>
   <div class="tab-sep"></div>
   <div class="tab" onclick="showTab('cmp',this)">So sánh tháng</div>
@@ -486,7 +489,7 @@ tr:last-child td{border-bottom:none}
 
   <div class="bod-header-bar no-print">
     <div>
-      <p class="stitle" style="margin:0">📋 Báo cáo BOD – Chuỗi PHÚC TEA</p>
+      <p class="stitle" style="margin:0">📋 BÁO CÁO CHUỖI CUNG ỨNG PHÚC TEA</p>
       <div class="bod-date" id="bodDateInfo">Đang tải dữ liệu...</div>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -496,7 +499,7 @@ tr:last-child td{border-bottom:none}
                style="border:1px solid #d0d7de;border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer">
         <button style="background:#6b7a8d;color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:11px;cursor:pointer" onclick="document.getElementById('bodReportDate').value='';renderBOD()">Mới nhất</button>
       </div>
-      <button class="bod-print-btn" onclick="window.print()">🖨️ In báo cáo</button>
+      <button class="bod-print-btn no-print" onclick="printBOD()">📄 Xuất PDF</button>
       <button class="bod-copy-btn" onclick="copyBOD()">📋 Copy gửi Zalo</button>
     </div>
   </div>
@@ -591,6 +594,7 @@ tr:last-child td{border-bottom:none}
         <option value="urgent">🔴 Quá 7 ngày</option>
         <option value="warn">🟡 Quá 5 ngày</option>
         <option value="ok">🟢 Đang xử lý</option>
+        <option value="partial">🔶 Giao 1 phần</option>
         <option value="sent">✅ Đã gửi hàng</option>
       </select>
     </div>
@@ -994,7 +998,7 @@ async function fetchSalesFromSheet(){
   try{
     const allData=[];
     for(const year of SALES_YEARS){
-      const url=`https://docs.google.com/spreadsheets/d/${SALES_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${year}`;
+      const url=`https://docs.google.com/spreadsheets/d/${SALES_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${year}&_t=${Date.now()}`;
       let resp;
       try{ resp=await fetch(url,{cache:'no-store'}); }
       catch(fe){ console.warn(`fetchSales ${year}:`,fe); continue; }
@@ -1011,7 +1015,7 @@ async function fetchSalesFromSheet(){
       if(rows.length<2){console.info(`Tab ${year}: rỗng`);continue;}
 
       // Map header
-      const headers=rows[0].map(h=>SALES_COL_MAP[h.trim()]||null);
+      const headers=rows[0].map(h=>SALES_COL_MAP[h.trim()]||SALES_COL_MAP[h.trim().toUpperCase()]||null);
       if(!headers.some(Boolean)){console.warn(`Tab ${year}: không nhận ra cột`,rows[0]);continue;}
 
       let cnt=0;
@@ -2374,7 +2378,7 @@ function copyBOD(){
   const cnLine = cn_tong_copy>0
     ? `\n💳 THU HỒI CÔNG NỢ T${lastMonth}\n• Tổng CN: ${fmtB(cn_tong_copy)}\n• CN Cũ đã thu: ${fmtB(cn_cu_copy)}${cn_kh_copy?' (KH: '+fmtB(cn_kh_copy)+')':''}  |  CN BH: ${fmtB(cn_bh_copy)}`
     : '';
-  const text=`📊 BÁO CÁO PHÚC TEA – ${String(lastDay).padStart(2,'0')}/${String(lastMonth).padStart(2,'0')}/${lastYear}
+  const text=`📊 BÁO CÁO CHUỖI CUNG ỨNG PHÚC TEA – ${String(lastDay).padStart(2,'0')}/${String(lastMonth).padStart(2,'0')}/${lastYear}
 ━━━━━━━━━━━━━━━━━━━━
 📅 TRONG NGÀY
 • Doanh thu: ${fmtB(dt_d)}
@@ -2471,6 +2475,20 @@ const ORD_TYPE_LABEL={
   vl:{label:'Vật liệu & VL ĐQ',    bg:'#fff8e6', cl:'#7a5800'},
   ht:{label:'Hệ Thống',             bg:'#ebf8ff', cl:'#2b6cb0'}
 };
+function countWorkdays(d1,d2){
+  // Đếm số ngày làm việc (T2-T6) từ d1 đến d2 (không tính d1, tính d2 nếu là ngày làm việc)
+  let count=0;
+  const cur=new Date(d1);cur.setHours(0,0,0,0);
+  const end=new Date(d2);end.setHours(0,0,0,0);
+  if(end<=cur) return 0;
+  cur.setDate(cur.getDate()+1); // bắt đầu từ ngày tiếp theo
+  while(cur<=end){
+    const dow=cur.getDay(); // 0=CN,6=T7
+    if(dow!==0&&dow!==6) count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return count;
+}
 function ordReset(){
   ['ordBrand','ordStatus','ordFrom','ordTo','ordType'].forEach(id=>{const e=document.getElementById(id);if(e)e.value='';});
   renderOrderTrack();
@@ -2492,27 +2510,30 @@ function renderOrderTrack(){
     if(to&&ng>to) return;
     const ot=getOrdType(r.loaiHang);
     const k=r.chiNhanh+'__'+ng+'__'+ot;
-    if(!map[k]) map[k]={chiNhanh:r.chiNhanh,brand:r.brand,ngay:ng,ordType:ot,ngayGui:'',tongDT:0,soSP:0};
+    if(!map[k]) map[k]={chiNhanh:r.chiNhanh,brand:r.brand,ngay:ng,ordType:ot,ngayGui:'',tongDT:0,soSP:0,countGui:0};
     const o=map[k];
     o.tongDT+=(r.thanhTien||0);
     o.soSP++;
-    if(!o.ngayGui&&r.ngayGuiHang) o.ngayGui=r.ngayGuiHang.slice(0,10);
+    if(r.ngayGuiHang){o.countGui++;if(!o.ngayGui)o.ngayGui=r.ngayGuiHang.slice(0,10);}
   });
   // Tính trạng thái từng đơn
   const orders=Object.values(map).map(o=>{
     const d=new Date(o.ngay);d.setHours(0,0,0,0);
-    o.daysWait=Math.max(0,Math.floor((today-d)/86400000));
-    o.code=o.ngayGui?'sent':o.daysWait>=7?'urgent':o.daysWait>=5?'warn':'ok';
+    o.daysWait=countWorkdays(d,today);
+    if(o.countGui>0&&o.countGui===o.soSP) o.code='sent';
+    else if(o.countGui>0) o.code='partial';
+    else o.code=o.daysWait>=7?'urgent':o.daysWait>=5?'warn':'ok';
     return o;
   });
   // Summary chips
-  const cnt={urgent:0,warn:0,ok:0,sent:0};
+  const cnt={urgent:0,warn:0,ok:0,partial:0,sent:0};
   orders.forEach(o=>cnt[o.code]++);
   const chip=(t,bg,cl)=>`<span style="background:${bg};color:${cl};padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700">${t}</span>`;
   let ha='';
   if(cnt.urgent)ha+=chip(`🔴 ${cnt.urgent} đơn quá 7 ngày chưa gửi`,'#fff0f0','#c53030')+' ';
   if(cnt.warn)ha+=chip(`🟡 ${cnt.warn} đơn quá 5 ngày chưa gửi`,'#fff8e6','#7a5800')+' ';
   if(cnt.ok)ha+=chip(`🟢 ${cnt.ok} đơn đang xử lý`,'#e8f5ee','#1a6b3c')+' ';
+  if(cnt.partial)ha+=chip(`🔶 ${cnt.partial} đơn giao 1 phần`,'#fff3e0','#b45309')+' ';
   if(cnt.sent)ha+=chip(`✅ ${cnt.sent} đơn đã gửi`,'#ebf8ff','#2b6cb0');
   const alEl=document.getElementById('ordAlerts');
   if(alEl) alEl.innerHTML=ha||'<span style="color:#aaa;font-size:12px">Không có dữ liệu trong khoảng đã chọn</span>';
@@ -2521,12 +2542,13 @@ function renderOrderTrack(){
   if(statusF) show=show.filter(o=>o.code===statusF);
   if(typeF) show=show.filter(o=>o.ordType===typeF);
   // Sắp xếp: urgent→warn→ok→sent, rồi ngày chờ lâu nhất, rồi cửa hàng
-  const pr={urgent:0,warn:1,ok:2,sent:3};
+  const pr={urgent:0,warn:1,ok:2,partial:3,sent:4};
   show.sort((a,b)=>(pr[a.code]-pr[b.code])||b.daysWait-a.daysWait||(a.chiNhanh>b.chiNhanh?1:-1));
   const slBadge={
     urgent:'<span style="background:#fff0f0;color:#c53030;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🔴 Quá 7 ngày</span>',
     warn:'<span style="background:#fff8e6;color:#7a5800;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🟡 Quá 5 ngày</span>',
     ok:'<span style="background:#e8f5ee;color:#1a6b3c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🟢 Đang xử lý</span>',
+    partial:'<span style="background:#fff3e0;color:#b45309;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🔶 Giao 1 phần</span>',
     sent:'<span style="background:#ebf8ff;color:#2b6cb0;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">✅ Đã gửi</span>'
   };
   let tb='';
@@ -2534,7 +2556,7 @@ function renderOrderTrack(){
     tb='<tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px">Không có đơn hàng nào phù hợp</td></tr>';
   } else {
     show.forEach((o,i)=>{
-      const rb=o.code==='urgent'?'background:#fff8f8':o.code==='warn'?'background:#fffdf0':'';
+      const rb=o.code==='urgent'?'background:#fff8f8':o.code==='warn'?'background:#fffdf0':o.code==='partial'?'background:#fffbf0':'';
       const sn=o.chiNhanh.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
       const tl=ORD_TYPE_LABEL[o.ordType]||{label:o.ordType,bg:'#f5f5f5',cl:'#555'};
       tb+=`<tr style="${rb}">
@@ -2543,9 +2565,9 @@ function renderOrderTrack(){
         <td><span style="background:${tl.bg};color:${tl.cl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${tl.label}</span></td>
         <td style="text-align:center">${o.ngay}</td>
         <td style="text-align:center">${o.ngayGui||'<span style="color:#bbb">–</span>'}</td>
-        <td style="text-align:center;font-weight:700;color:${o.code==='urgent'?'#c53030':o.code==='warn'?'#7a5800':o.code==='sent'?'#2b6cb0':'#1a6b3c'}">${o.code==='sent'?'–':o.daysWait+' ngày'}</td>
+        <td style="text-align:center;font-weight:700;color:${o.code==='urgent'?'#c53030':o.code==='warn'?'#7a5800':o.code==='sent'?'#2b6cb0':o.code==='partial'?'#b45309':'#1a6b3c'}">${o.code==='sent'?'–':o.daysWait+' ngày'}</td>
         <td style="text-align:right;font-weight:700">${fmtB(o.tongDT)}</td>
-        <td style="text-align:center">${o.soSP}</td>
+        <td style="text-align:center">${o.code==='partial'?`<span style="color:#b45309;font-weight:700">${o.countGui}/${o.soSP} SP</span>`:o.soSP}</td>
         <td>${slBadge[o.code]||''}</td>
       </tr>`;
     });
@@ -2565,14 +2587,13 @@ function renderOrderTrack(){
   kpiRows.forEach(o=>{
     const s=kpiStat[o.ordType]||kpiStat.ht;
     s.total++;
-    if(o.ngayGui){
-      // Đã gửi — tính số ngày từ ngày đặt → ngày gửi
+    if(o.code==='sent'){
+      // Đã gửi đủ — tính số ngày từ ngày đặt → ngày gửi
       const d1=new Date(o.ngay),d2=new Date(o.ngayGui);
-      d1.setHours(0,0,0,0);d2.setHours(0,0,0,0);
-      const gap=Math.round((d2-d1)/86400000);
+      const gap=countWorkdays(d1,d2);
       if(gap<=KPI_DAY) s.duiHan++; else s.treHan++;
     } else {
-      // Chưa gửi
+      // Chưa gửi hoặc giao 1 phần → chưa hoàn thành
       if(o.daysWait>KPI_DAY) s.chuaGiaoQuaHan++; else s.chuaGiao++;
     }
   });
@@ -2655,6 +2676,11 @@ function setWeek7d(){
   document.getElementById('weekFrom').value=d7.toISOString().slice(0,10);
   document.getElementById('weekTo').value=now.toISOString().slice(0,10);
   renderWeekReport();
+}
+function printBOD(){
+  document.body.classList.add('printing-bod');
+  window.print();
+  setTimeout(()=>document.body.classList.remove('printing-bod'),1000);
 }
 function printWeekReport(){
   document.body.classList.add('printing-week');
