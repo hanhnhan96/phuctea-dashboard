@@ -159,6 +159,14 @@ tr:last-child td{border-bottom:none}
 .bod-progress{height:5px;background:#e0e6ed;border-radius:3px;margin-top:6px;overflow:hidden}
 .bod-progress-bar{height:100%;border-radius:3px;transition:width .5s}
 .bod-row-header{background:#f8fafc;padding:10px 16px;font-size:11px;font-weight:700;color:var(--g);border-bottom:1px solid var(--bdr)}
+.bod-day-table{width:100%;border-collapse:collapse;font-size:12px}
+.bod-day-table thead th{background:var(--ge);color:var(--g);font-weight:700;padding:8px 10px;border-bottom:2px solid var(--g);white-space:nowrap;position:sticky;top:0;z-index:1;text-align:left}
+.bod-day-table thead th.r{text-align:right}
+.bod-day-table thead th.c{text-align:center}
+.bod-day-table td{padding:8px 10px;border-bottom:1px solid var(--bdr);vertical-align:middle;text-align:left}
+.bod-day-table td.r{text-align:right}
+.bod-day-table td.c{text-align:center}
+.bod-day-table tr:hover td{background:#f8fafc}
 .bod-group-table{width:100%;border-collapse:collapse;font-size:12px}
 .bod-group-table th{background:#f0f7f2;color:var(--g);font-weight:700;padding:9px 12px;text-align:right;border-bottom:2px solid var(--g);white-space:nowrap}
 .bod-group-table th:first-child{text-align:left}
@@ -536,8 +544,8 @@ tr:last-child td{border-bottom:none}
   <div class="bod-section">
     <div class="bod-section-title">📅 Chi tiết theo ngày (7 ngày gần nhất) <span></span></div>
     <div class="tbl-wrap" style="padding:0">
-      <table>
-        <thead><tr><th>Ngày</th><th>Doanh thu</th><th>Lợi nhuận</th><th>TSLN</th><th>Số lượng</th></tr></thead>
+      <table class="bod-day-table">
+        <thead><tr><th>Ngày</th><th class="r">Doanh thu</th><th class="r">Lợi nhuận</th><th class="c">TSLN</th><th class="r">Số lượng</th></tr></thead>
         <tbody id="bodDayTbody"></tbody>
       </table>
     </div>
@@ -2110,7 +2118,7 @@ function renderBOD(){
     return r;
   }
   function sumF(arr,f){return arr.reduce((s,r)=>s+(r[f]||0),0);}
-  function tsln(arr){const dt=sumF(arr,'tongThanhTien');return dt>0?sumF(arr,'lnThuc')/dt:0;}
+  function tsln(arr){const dt=sumF(arr,'tongThanhTien');return dt>0?sumF(arr,'tongLoiNhuan')/dt:0;}
   function tsln_truoc(arr){const dt=sumF(arr,'thanhTien');return dt>0?sumF(arr,'lnThuc')/dt:0;}
 
   // Lấy targets từ localStorage (KPI tab)
@@ -2266,10 +2274,10 @@ function renderBOD(){
     const tsln_d=v.dt>0?v.ln/v.dt:0;
     tb+=`<tr>
       <td style="font-weight:600">${d}/${mo}/${y}</td>
-      <td style="font-weight:700;color:var(--g)">${fmtB(v.dt)}</td>
-      <td>${fmtB(v.ln)}</td>
-      <td><span style="font-weight:700;color:${tsln_d>=0.3?'#2d9e5f':tsln_d>=0.2?'#d69e2e':'#e53e3e'}">${pct(tsln_d)}</span></td>
-      <td>${fmt(v.sl)}</td>
+      <td class="r" style="font-weight:700;color:var(--g)">${fmtB(v.dt)}</td>
+      <td class="r">${fmtB(v.ln)}</td>
+      <td class="c"><span style="font-weight:700;color:${tsln_d>=0.3?'#2d9e5f':tsln_d>=0.2?'#d69e2e':'#e53e3e'}">${pct(tsln_d)}</span></td>
+      <td class="r">${fmt(v.sl)}</td>
     </tr>`;
   });
   document.getElementById('bodDayTbody').innerHTML=tb||'<tr><td colspan="5" style="text-align:center;color:var(--muted)">Không có dữ liệu</td></tr>';
