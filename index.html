@@ -2765,6 +2765,53 @@ function renderWeekReport(){
   const printSub=document.getElementById('weekPrintSub');
   if(printSub) printSub.textContent=`Tuần ${fromFmt} – ${toFmt}  |  Xuất ngày ${new Date().toLocaleDateString('vi-VN')}`;
 
+  // ===== BẢNG CƠ CẤU THEO NHÓM HÀNG =====
+  function groupTable(arr){
+    const map={};
+    arr.forEach(r=>{
+      const g=r.loaiHang||'Khác';
+      if(!map[g]) map[g]={dt:0,ln:0};
+      map[g].dt+=(r.thanhTien||0);
+      map[g].ln+=(r.lnThuc||0);
+    });
+    const totalDT=Object.values(map).reduce((s,v)=>s+v.dt,0);
+    const totalLN=Object.values(map).reduce((s,v)=>s+v.ln,0);
+    const sorted=Object.entries(map)
+      .map(([g,v])=>({g,dt:v.dt,ln:v.ln,tsln:v.dt>0?v.ln/v.dt:0,wDT:totalDT>0?v.dt/totalDT:0,wLN:totalLN>0?v.ln/totalLN:0}))
+      .sort((a,b)=>b.dt-a.dt);
+    const bar=v=>{const p=Math.min(100,v*100).toFixed(1);const c=v>=0.5?'#2d9e5f':v>=0.25?'#d69e2e':'#94a3b8';return`<div style="display:flex;align-items:center;gap:4px"><div style="flex:1;height:6px;background:#e8f0ed;border-radius:3px;overflow:hidden"><div style="width:${p}%;height:100%;background:${c};border-radius:3px"></div></div><span style="font-size:10px;min-width:34px">${p}%</span></div>`;};
+    const tsClass=v=>v>=0.3?'#2d9e5f':v>=0.2?'#d69e2e':'#e53e3e';
+    let tb='';
+    sorted.forEach(v=>{
+      tb+=`<tr>
+        <td style="text-align:left;font-weight:600;color:#333;padding:8px 12px">${v.g}</td>
+        <td style="text-align:right;font-weight:700;color:var(--g);padding:8px 12px">${fB(v.dt)}</td>
+        <td style="text-align:right;padding:8px 12px">${fB(v.ln)}</td>
+        <td style="text-align:center;padding:8px 12px"><span style="font-weight:700;color:${tsClass(v.tsln)}">${(v.tsln*100).toFixed(1)}%</span></td>
+        <td style="padding:8px 12px;min-width:100px">${bar(v.wDT)}</td>
+        <td style="padding:8px 12px;min-width:100px">${bar(v.wLN)}</td>
+      </tr>`;
+    });
+    const tsln_tot=totalDT>0?totalLN/totalDT:0;
+    tb+=`<tr style="background:#f0f7f2;font-weight:700;color:var(--g);border-top:2px solid var(--g)">
+      <td style="padding:8px 12px">TỔNG CỘNG</td>
+      <td style="text-align:right;padding:8px 12px">${fB(totalDT)}</td>
+      <td style="text-align:right;padding:8px 12px">${fB(totalLN)}</td>
+      <td style="text-align:center;padding:8px 12px"><span style="color:${tsClass(tsln_tot)}">${(tsln_tot*100).toFixed(1)}%</span></td>
+      <td style="padding:8px 12px;font-weight:700">100%</td>
+      <td style="padding:8px 12px;font-weight:700">100%</td>
+    </tr>`;
+    return`<div style="overflow-x:auto">
+      <table class="bod-group-table" style="min-width:600px">
+        <thead><tr>
+          <th style="text-align:left">Nhóm hàng</th>
+          <th>Doanh thu</th><th>Lợi nhuận</th><th style="text-align:center">TSLN</th>
+          <th>Tỷ trọng DT</th><th>Tỷ trọng LN</th>
+        </tr></thead>
+        <tbody>${tb}</tbody>
+      </table></div>`;
+  }
+
   el.innerHTML=`
     <div style="font-size:13px;color:#555;margin-bottom:14px;padding:8px 12px;background:#f8fafc;border-radius:8px;border-left:3px solid #3182ce">
       📅 Tuần <b>${fromFmt}</b> – <b>${toFmt}</b> &nbsp;|&nbsp; ${nDays} ngày &nbsp;|&nbsp; ${rows.length} đơn hàng &nbsp;|&nbsp; ${fB(rows.reduce((s,r)=>s+(r.sl||0),0))} sản phẩm
@@ -2772,6 +2819,10 @@ function renderWeekReport(){
     ${card('Toàn hệ thống','#3182ce','🏪',all,cnTongAll,cnCuAll)}
     ${card('Phúc Tea','#1a6b3c','🍵',pt,null,null)}
     ${card('The Hoa','#6b21a8','🌸',th,null,null)}
+    <div style="background:#fff;border-radius:12px;border:1.5px solid #1a6b3c20;box-shadow:0 2px 8px #0001;overflow:hidden;margin-bottom:16px">
+      <div style="background:#1a6b3c12;padding:14px 18px;border-bottom:1px solid #1a6b3c20;font-weight:700;font-size:14px;color:var(--g)">📦 Cơ cấu Doanh thu &amp; Lợi nhuận theo Nhóm hàng</div>
+      ${groupTable(rows)}
+    </div>
   `;
 }
 
