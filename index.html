@@ -2820,7 +2820,15 @@ function renderWeekReport(){
     ${card('Phúc Tea','#1a6b3c','🍵',pt,null,null)}
     ${card('The Hoa','#6b21a8','🌸',th,null,null)}
     <div style="background:#fff;border-radius:12px;border:1.5px solid #1a6b3c20;box-shadow:0 2px 8px #0001;overflow:hidden;margin-bottom:16px">
-      <div style="background:#1a6b3c12;padding:14px 18px;border-bottom:1px solid #1a6b3c20;font-weight:700;font-size:14px;color:var(--g)">📦 Cơ cấu Doanh thu &amp; Lợi nhuận theo Nhóm hàng</div>
+      <div style="background:#1a6b3c12;padding:14px 18px;border-bottom:1px solid #1a6b3c20;font-weight:700;font-size:14px;color:var(--g)">📦 Cơ cấu theo Nhóm hàng – 🍵 Phúc Tea</div>
+      ${groupTable(ptRows)}
+    </div>
+    <div style="background:#fff;border-radius:12px;border:1.5px solid #6b21a820;box-shadow:0 2px 8px #0001;overflow:hidden;margin-bottom:16px">
+      <div style="background:#6b21a812;padding:14px 18px;border-bottom:1px solid #6b21a820;font-weight:700;font-size:14px;color:#6b21a8">📦 Cơ cấu theo Nhóm hàng – 🌸 The Hoa</div>
+      ${groupTable(thRows)}
+    </div>
+    <div style="background:#fff;border-radius:12px;border:1.5px solid #3182ce20;box-shadow:0 2px 8px #0001;overflow:hidden;margin-bottom:16px">
+      <div style="background:#3182ce12;padding:14px 18px;border-bottom:1px solid #3182ce20;font-weight:700;font-size:14px;color:#3182ce">📦 Cơ cấu theo Nhóm hàng – 🏪 Toàn hệ thống</div>
       ${groupTable(rows)}
     </div>
   `;
