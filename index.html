@@ -624,6 +624,12 @@ tr:last-child td{border-bottom:none}
     <div id="ordKpiTable"></div>
   </div>
 
+  <!-- PHÂN BỐ THỜI GIAN GIAO HÀNG -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="ch"><div class="ctitle">⏱️ Phân bố thời gian hoàn thành đơn</div><div class="csub">Chỉ tính đơn đã giao đủ (ngày làm việc, trừ T7 & CN)</div></div>
+    <div id="ordDeliveryDist"></div>
+  </div>
+
   <div class="tbl-wrap">
     <table>
       <thead><tr>
@@ -2656,6 +2662,47 @@ function renderOrderTrack(){
       <td style="padding:8px 10px;min-width:100px"><div style="font-size:16px;font-weight:800;color:${dp>=100?'#1a6b3c':dp>=80?'#f0a500':'#c53030'}">${denomAll?dp+'%':'–'}</div>${barT}</td>
     </tr>`;
     kpiTbl.innerHTML=kh+'</tbody></table>';
+  }
+
+  // ===== PHÂN BỐ THỜI GIAN GIAO HÀNG =====
+  const distEl=document.getElementById('ordDeliveryDist');
+  if(distEl){
+    // Chỉ tính đơn đã gửi đủ (code==='sent')
+    const sentOrders=kpiRows.filter(o=>o.code==='sent');
+    const buckets=[
+      {label:'1 – 3 ngày', min:1, max:3, bg:'#e8f5ee', cl:'#1a6b3c', icon:'🟢'},
+      {label:'4 – 5 ngày', min:4, max:5, bg:'#fff8e6', cl:'#7a5800', icon:'🟡'},
+      {label:'6 – 7 ngày', min:6, max:7, bg:'#fff3e0', cl:'#b45309', icon:'🟠'},
+      {label:'Trên 7 ngày',min:8, max:Infinity, bg:'#fff0f0', cl:'#c53030', icon:'🔴'},
+    ];
+    buckets.forEach(b=>b.count=0);
+    sentOrders.forEach(o=>{
+      const d1=new Date(o.ngay),d2=new Date(o.ngayGui);
+      const gap=countWorkdays(d1,d2);
+      const b=buckets.find(b=>gap>=b.min&&gap<=b.max);
+      if(b) b.count++;
+    });
+    const total=sentOrders.length;
+    if(!total){
+      distEl.innerHTML='<div style="color:#aaa;font-size:12px;padding:12px 0">Chưa có đơn nào hoàn thành trong khoảng lọc.</div>';
+    } else {
+      let dh=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">`;
+      buckets.forEach(b=>{
+        const pct=total>0?Math.round(b.count/total*100):0;
+        dh+=`<div style="background:${b.bg};border-radius:10px;padding:14px 16px;text-align:center">
+          <div style="font-size:22px;margin-bottom:4px">${b.icon}</div>
+          <div style="font-size:11px;font-weight:700;color:${b.cl};margin-bottom:6px">${b.label}</div>
+          <div style="font-size:28px;font-weight:800;color:${b.cl};line-height:1">${b.count}</div>
+          <div style="font-size:11px;color:${b.cl};opacity:.8;margin-top:4px">${pct}% tổng đơn</div>
+          <div style="background:#0001;border-radius:4px;height:5px;margin-top:8px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${b.cl};border-radius:4px;opacity:.7"></div>
+          </div>
+        </div>`;
+      });
+      dh+=`</div>
+      <div style="margin-top:8px;font-size:11px;color:#aaa;text-align:right">Tổng đơn hoàn thành: <b style="color:#555">${total}</b></div>`;
+      distEl.innerHTML=dh;
+    }
   }
 }
 
