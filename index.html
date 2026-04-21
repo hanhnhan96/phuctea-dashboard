@@ -540,6 +540,13 @@ tr:last-child td{border-bottom:none}
     <div class="bod-grid" id="bodCNGrid"></div>
   </div>
 
+  <!-- CÔNG NỢ CỬA HÀNG HỆ THỐNG -->
+  <div class="bod-section">
+    <div class="bod-section-title">🏠 Công nợ – Cửa hàng Hệ Thống <span id="bodCNHTsub"></span></div>
+    <div class="bod-row-header">DT = Thu công nợ · PHUCTEA138 · PHUCTEACENTER001 · THEHOA001 · THEHOA002</div>
+    <div class="bod-grid" id="bodCNHTGrid"></div>
+  </div>
+
   <!-- CHI TIẾT NGÀY -->
   <div class="bod-section">
     <div class="bod-section-title">📅 Chi tiết theo ngày (7 ngày gần nhất) <span></span></div>
@@ -1144,6 +1151,8 @@ function onMonthChange(){
 // ===== THU CÔNG NỢ – LIVE DATA =====
 let _cnBH={}, _cnKPI={};
 let _cnBHDay={}, _cnKPIDay={}; // keyed by yyyy-MM-dd
+// CH Hệ Thống: DT = thu công nợ
+const CN_HT_STORES=['PHUCTEA138','PHUCTEACENTER001','THEHOA001','THEHOA002'];
 
 async function fetchCNFromSheet(){
   const url=`https://docs.google.com/spreadsheets/d/1DR4q16Whx7QFlw3KIPbtR-6RpbDpwQ1MeOyT3faHnu4/gviz/tq?tqx=out:csv&sheet=THU%20C%C3%94NG%20N%E1%BB%A2`;
@@ -2261,6 +2270,32 @@ function renderBOD(){
     cellCN('Tổng thu CN Lũy kế năm', cn_tong_y, null, 'Từ cột F:G sheet') +
     cellCN(`CN Cũ đã thu T${lastMonth}`, cn_cu_m, cn_kh_m, 'Chưa có KH') +
     cellCN(`CN Bán hàng T${lastMonth}`, cn_bh_m, null, 'Tổng − CN Cũ');
+
+  // ===== CÔNG NỢ CH HỆ THỐNG =====
+  document.getElementById('bodCNHTsub').textContent=`Dữ liệu đến ${lastDateStr}`;
+  function isHT(cn){ return CN_HT_STORES.some(s=>(cn||'').toUpperCase().startsWith(s)); }
+  // Tháng hiện tại
+  const htRows_m = data2026.filter(r=>r.thang===lastMonth&&isHT(r.chiNhanh));
+  const ht_cn_m  = htRows_m.reduce((s,r)=>s+(r.tongThanhTien||0),0);
+  // Lũy kế năm
+  const htRows_y = data2026.filter(r=>isHT(r.chiNhanh));
+  const ht_cn_y  = htRows_y.reduce((s,r)=>s+(r.tongThanhTien||0),0);
+  // Từng CH trong tháng
+  const htByStore={};
+  htRows_m.forEach(r=>{
+    const k=r.chiNhanh||'Khác';
+    htByStore[k]=(htByStore[k]||0)+(r.tongThanhTien||0);
+  });
+  const htStoreHtml=Object.entries(htByStore)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v])=>{
+      const sn=k.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
+      return `<div class="bod-cell"><div class="bod-cell-label">${sn}</div><div class="bod-cell-val" style="font-size:15px">${fmtB(v)}</div><div class="bod-cell-target">${k}</div></div>`;
+    }).join('');
+  document.getElementById('bodCNHTGrid').innerHTML =
+    cellCN(`Tổng CN HT T${lastMonth}`, ht_cn_m, null, 'Tổng thành tiền') +
+    cellCN('CN HT Lũy kế năm', ht_cn_y, null, 'Tổng thành tiền') +
+    htStoreHtml;
 
   // Bảng 7 ngày gần nhất
   const dayMap={};
