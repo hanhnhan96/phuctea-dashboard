@@ -544,7 +544,7 @@ tr:last-child td{border-bottom:none}
   <div class="bod-section">
     <div class="bod-section-title">🏠 Công nợ – Cửa hàng Hệ Thống <span id="bodCNHTsub"></span></div>
     <div class="bod-row-header">DT = Thu công nợ · PHUCTEA138 · PHUCTEACENTER001 · THEHOA001 · THEHOA002</div>
-    <div class="bod-grid" id="bodCNHTGrid"></div>
+    <div id="bodCNHTGrid"></div>
   </div>
 
   <!-- CHI TIẾT NGÀY -->
@@ -2274,28 +2274,50 @@ function renderBOD(){
   // ===== CÔNG NỢ CH HỆ THỐNG =====
   document.getElementById('bodCNHTsub').textContent=`Dữ liệu đến ${lastDateStr}`;
   function isHT(cn){ return CN_HT_STORES.some(s=>(cn||'').toUpperCase().startsWith(s)); }
-  // Tháng hiện tại
-  const htRows_m = data2026.filter(r=>r.thang===lastMonth&&isHT(r.chiNhanh));
-  const ht_cn_m  = htRows_m.reduce((s,r)=>s+(r.tongThanhTien||0),0);
-  // Lũy kế năm
-  const htRows_y = data2026.filter(r=>isHT(r.chiNhanh));
-  const ht_cn_y  = htRows_y.reduce((s,r)=>s+(r.tongThanhTien||0),0);
-  // Từng CH trong tháng
-  const htByStore={};
-  htRows_m.forEach(r=>{
-    const k=r.chiNhanh||'Khác';
-    htByStore[k]=(htByStore[k]||0)+(r.tongThanhTien||0);
+  // Tổng tháng & năm
+  const ht_cn_m = data2026.filter(r=>r.thang===lastMonth&&isHT(r.chiNhanh)).reduce((s,r)=>s+(r.tongThanhTien||0),0);
+  const ht_cn_y = data2026.filter(r=>isHT(r.chiNhanh)).reduce((s,r)=>s+(r.tongThanhTien||0),0);
+  // Từng CH: tháng + năm
+  const htStoreMap={};
+  CN_HT_STORES.forEach(code=>{ htStoreMap[code]={m:0,y:0,name:''}; });
+  data2026.forEach(r=>{
+    if(!isHT(r.chiNhanh)) return;
+    const code=CN_HT_STORES.find(s=>(r.chiNhanh||'').toUpperCase().startsWith(s));
+    if(!code) return;
+    const v=r.tongThanhTien||0;
+    htStoreMap[code].y+=v;
+    if(!htStoreMap[code].name&&r.chiNhanh) htStoreMap[code].name=r.chiNhanh;
+    if(r.thang===lastMonth) htStoreMap[code].m+=v;
   });
-  const htStoreHtml=Object.entries(htByStore)
-    .sort((a,b)=>b[1]-a[1])
-    .map(([k,v])=>{
-      const sn=k.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
-      return `<div class="bod-cell"><div class="bod-cell-label">${sn}</div><div class="bod-cell-val" style="font-size:15px">${fmtB(v)}</div><div class="bod-cell-target">${k}</div></div>`;
-    }).join('');
+  const htStoreHtml=CN_HT_STORES.map(code=>{
+    const s=htStoreMap[code];
+    const fullName=s.name||code;
+    return `<div class="bod-cell">
+      <div class="bod-cell-label" style="font-size:9px;line-height:1.3">${fullName}</div>
+      <div style="margin-top:6px">
+        <div style="font-size:10px;color:var(--muted);font-weight:700">T${lastMonth}</div>
+        <div style="font-size:16px;font-weight:700;color:var(--tx)">${fmtB(s.m)}</div>
+      </div>
+      <div style="margin-top:6px;border-top:1px solid var(--bdr);padding-top:6px">
+        <div style="font-size:10px;color:var(--muted);font-weight:700">Lũy kế năm</div>
+        <div style="font-size:13px;font-weight:700;color:#3182ce">${fmtB(s.y)}</div>
+      </div>
+    </div>`;
+  }).join('');
   document.getElementById('bodCNHTGrid').innerHTML =
-    cellCN(`Tổng CN HT T${lastMonth}`, ht_cn_m, null, 'Tổng thành tiền') +
-    cellCN('CN HT Lũy kế năm', ht_cn_y, null, 'Tổng thành tiền') +
-    htStoreHtml;
+    `<div style="display:grid;grid-template-columns:1fr 1fr;border-bottom:1px solid var(--bdr)">
+      <div class="bod-cell" style="border-right:1px solid var(--bdr)">
+        <div class="bod-cell-label">TỔNG CN HT T${lastMonth}</div>
+        <div class="bod-cell-val">${fmtB(ht_cn_m)}</div>
+        <div class="bod-cell-target">Tổng thành tiền 4 CH</div>
+      </div>
+      <div class="bod-cell">
+        <div class="bod-cell-label">CN HT LŨY KẾ NĂM</div>
+        <div class="bod-cell-val">${fmtB(ht_cn_y)}</div>
+        <div class="bod-cell-target">Tổng thành tiền 4 CH</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr)">${htStoreHtml}</div>`;
 
   // Bảng 7 ngày gần nhất
   const dayMap={};
