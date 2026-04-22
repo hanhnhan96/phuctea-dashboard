@@ -3364,11 +3364,11 @@ const CN_SHEET_ID='1DR4q16Whx7QFlw3KIPbtR-6RpbDpwQ1MeOyT3faHnu4';
 let _badDebtData=[];
 let _badDebtHeaders=[];
 
-// Cấu trúc cố định:
-// J(9)=KH tháng, K(10)=TT thực tế, L(11)=Ngày thanh toán
-// N(13)=Phân Loại, O(14)=Tên CH, P(15)=Tồn nợ 2026
-const NX_I_KH=9, NX_I_TT=10, NX_I_NGAY=11;
-const NX_I_LOAI=13, NX_I_TEN=14, NX_I_TON=15;
+// Cấu trúc 2 loại row:
+// [Store row]   N(13)=Phân Loại, O(14)=Tên CH, P(15)=Tồn nợ 2026, Q(16)=KH
+// [Payment row] J(9)=Ngày TT,    K(10)=Số TT,  L(11)=Tên CH (map với O)
+const NX_I_NGAY=9, NX_I_TT_AMT=10, NX_I_TT_TEN=11;
+const NX_I_LOAI=13, NX_I_TEN=14, NX_I_TON=15, NX_I_KH=16;
 
 async function fetchBadDebt(){
   const url=`https://docs.google.com/spreadsheets/d/${CN_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=THU%20C%C3%94NG%20N%E1%BB%A2&_t=${Date.now()}`;
@@ -3380,21 +3380,45 @@ async function fetchBadDebt(){
     const rows=parseSalesCSV(text);
     if(rows.length<2) return;
     _badDebtHeaders=rows[0];
+
+    // Pass 1: thu thập payment rows (J=Ngày, K=Số TT, L=Tên CH)
+    const payMap={}; // key = tên CH (lowercase trim) → {tt, ngay}
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];
+      if(!r) continue;
+      const ttTen=(r[NX_I_TT_TEN]||'').trim();
+      const ttAmt=parseSalesNum(r[NX_I_TT_AMT]);
+      if(ttTen&&!isNaN(ttAmt)&&ttAmt>0){
+        const key=ttTen.toLowerCase();
+        if(!payMap[key]) payMap[key]={tt:0,ngay:''};
+        payMap[key].tt+=ttAmt;
+        if(!payMap[key].ngay&&r[NX_I_NGAY]) payMap[key].ngay=(r[NX_I_NGAY]||'').trim();
+      }
+    }
+
+    // Pass 2: thu thập store rows (N=Phân Loại, O=Tên CH, P=Tồn nợ, Q=KH)
     _badDebtData=[];
     for(let i=1;i<rows.length;i++){
       const r=rows[i];
       if(!r||r.every(c=>!c)) continue;
       const ten=(r[NX_I_TEN]||'').trim();
+      const loai=(r[NX_I_LOAI]||'').trim();
       const ton=parseSalesNum(r[NX_I_TON]);
-      if(!ten&&isNaN(ton)) continue; // bỏ row rỗng
+      const kh=parseSalesNum(r[NX_I_KH]);
+      // Store row = có tên CH (O) hoặc tồn nợ (P) hoặc KH (Q)
+      if(!ten&&isNaN(ton)&&isNaN(kh)) continue;
+      // Lookup payment
+      const pay=payMap[ten.toLowerCase()]||{tt:0,ngay:''};
       _badDebtData.push({
-        loai:(r[NX_I_LOAI]||'').trim(),
+        loai,
         ten,
         ton:isNaN(ton)?0:ton,
-        raw:r
+        kh:isNaN(kh)?0:kh,
+        tt:pay.tt,
+        ngay:pay.ngay
       });
     }
-    console.info('fetchBadDebt OK:',_badDebtData.length,'rows');
+    console.info('fetchBadDebt OK: stores=',_badDebtData.length,'payMap keys=',Object.keys(payMap).length);
   }catch(e){console.warn('fetchBadDebt:',e.message);}
 }
 
@@ -3410,9 +3434,9 @@ function renderBadDebt(){
     tb='<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">Chưa có dữ liệu – nhấn 🔄 Tải lại</td></tr>';
   } else {
     _badDebtData.forEach((d,i)=>{
-      const kh=parseSalesNum(d.raw[NX_I_KH])||0;
-      const tt=parseSalesNum(d.raw[NX_I_TT])||0;
-      const ngay=(d.raw[NX_I_NGAY]||'').trim();
+      const kh=d.kh||0;
+      const tt=d.tt||0;
+      const ngay=d.ngay||'';
       const conlai=d.ton-tt;
       const pct=kh>0?(tt/kh*100):null;
       const pctTxt=pct!==null?pct.toFixed(1)+'%':'–';
