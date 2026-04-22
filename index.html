@@ -3379,6 +3379,7 @@ let _badDebtHeaders=[];
 // [Payment row] J(9)=Ngày TT, K(10)=Số TT, L(11)=Tên CH (map với O)
 const NX_I_NGAY=9, NX_I_TT_AMT=10, NX_I_TT_TEN=11;
 const NX_I_LOAI=13, NX_I_TEN=14, NX_I_TON=15, NX_KH_BASE=16; // Q=T1
+const NX_KH_FIXED=25000000; // KH cố định mỗi tháng
 
 async function fetchBadDebt(){
   const url=`https://docs.google.com/spreadsheets/d/${CN_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=THU%20C%C3%94NG%20N%E1%BB%A2&_t=${Date.now()}`;
@@ -3434,20 +3435,31 @@ function renderBadDebt(){
   const fB=n=>(!n||isNaN(n))?'–':new Intl.NumberFormat('vi-VN').format(Math.round(n));
   const fD=s=>{if(!s) return'–'; const d=parseSalesDate(s); return d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):s;};
 
+  // Sắp xếp: Hoàn thành → Ít hơn KH → Chưa thanh toán
+  function nxStatus(d){
+    const cumPrev=d.payments.filter(p=>p.month>0&&p.month<m).reduce((s,p)=>s+p.tt,0);
+    if(d.ton>0&&cumPrev>=d.ton) return 99; // sẽ bị ẩn
+    const tt=d.payments.filter(p=>p.month===m).reduce((s,p)=>s+p.tt,0);
+    if(tt>=NX_KH_FIXED) return 0;   // Hoàn thành
+    if(tt>0) return 1;              // Ít hơn KH
+    return 2;                       // Chưa thanh toán
+  }
+  const sorted=[..._badDebtData].sort((a,b)=>nxStatus(a)-nxStatus(b)||(a.loai||'').localeCompare(b.loai||'')||(a.ten||'').localeCompare(b.ten||''));
+
   let tb='',totTon=0,totKH=0,totTT=0,totConTon=0;
   let curLoai='',loaiIdx=0,rowNum=0;
 
   if(!_badDebtData.length){
     tb='<tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px">Chưa có dữ liệu – nhấn 🔄 Tải lại</td></tr>';
   } else {
-    _badDebtData.forEach(d=>{
+    sorted.forEach(d=>{
       // Tổng TT tích lũy đến tháng m-1 (tháng trước)
       const cumTT_prev=d.payments.filter(p=>p.month>0&&p.month<m).reduce((s,p)=>s+p.tt,0);
       // Nếu nợ đã tất toán trước tháng này → ẩn
       if(d.ton>0&&cumTT_prev>=d.ton) return;
 
-      // KH cố định
-      const kh=d.kh||0;
+      // KH cố định 25tr/tháng
+      const kh=NX_KH_FIXED;
       // TT tháng m
       const pays=d.payments.filter(p=>p.month===m);
       const tt=pays.reduce((s,p)=>s+p.tt,0);
