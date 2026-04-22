@@ -3414,16 +3414,13 @@ async function fetchBadDebt(){
       const ten=(r[NX_I_TEN]||'').trim();
       const loai=(r[NX_I_LOAI]||'').trim();
       const ton=parseSalesNum(r[NX_I_TON]);
-      // KH từng tháng: Q(16)=T1, R(17)=T2 ...
-      const khArr=Array.from({length:12},(_,i)=>{
-        const v=parseSalesNum(r[NX_KH_BASE+i]);
-        return isNaN(v)?0:v;
-      });
-      if(!ten&&isNaN(ton)&&khArr.every(v=>v===0)) continue;
+      // KH cố định dùng chung mọi tháng (cột Q)
+      const kh=parseSalesNum(r[NX_KH_BASE]);
+      if(!ten&&isNaN(ton)&&isNaN(kh)) continue;
       _badDebtData.push({
         loai, ten,
         ton:isNaN(ton)?0:ton,
-        khArr,                               // KH từng tháng
+        kh:isNaN(kh)?0:kh,                    // KH tháng (cố định)
         payments:payMap[ten.toLowerCase()]||[] // [{tt,month,ngay}]
       });
     }
@@ -3443,8 +3440,8 @@ function renderBadDebt(){
     tb='<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">Chưa có dữ liệu – nhấn 🔄 Tải lại</td></tr>';
   } else {
     _badDebtData.forEach((d,i)=>{
-      // KH của tháng m (cột Q+m-1)
-      const kh=d.khArr[m-1]||0;
+      // KH cố định (cột Q, dùng chung mọi tháng)
+      const kh=d.kh||0;
       // TT của tháng m (lọc payment có month===m)
       const pays=d.payments.filter(p=>p.month===m);
       const tt=pays.reduce((s,p)=>s+p.tt,0);
