@@ -920,6 +920,7 @@ tr:last-child td{border-bottom:none}
         <th style="text-align:right">TT thực tế</th>
         <th style="text-align:center">Ngày TT</th>
         <th style="text-align:center">% Đạt</th>
+        <th style="text-align:right">CN Còn Tồn</th>
         <th style="text-align:center">Trạng thái</th>
       </tr></thead>
       <tbody id="nxTbody"></tbody>
@@ -3433,22 +3434,29 @@ function renderBadDebt(){
   const fB=n=>(!n||isNaN(n))?'–':new Intl.NumberFormat('vi-VN').format(Math.round(n));
   const fD=s=>{if(!s) return'–'; const d=parseSalesDate(s); return d?d.slice(8,10)+'/'+d.slice(5,7)+'/'+d.slice(0,4):s;};
 
-  let tb='',totTon=0,totKH=0,totTT=0;
-  let curLoai='',loaiIdx=0;
+  let tb='',totTon=0,totKH=0,totTT=0,totConTon=0;
+  let curLoai='',loaiIdx=0,rowNum=0;
 
   if(!_badDebtData.length){
-    tb='<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">Chưa có dữ liệu – nhấn 🔄 Tải lại</td></tr>';
+    tb='<tr><td colspan="9" style="text-align:center;color:#aaa;padding:24px">Chưa có dữ liệu – nhấn 🔄 Tải lại</td></tr>';
   } else {
-    _badDebtData.forEach((d,i)=>{
-      // KH cố định (cột Q, dùng chung mọi tháng)
+    _badDebtData.forEach(d=>{
+      // Tổng TT tích lũy đến tháng m-1 (tháng trước)
+      const cumTT_prev=d.payments.filter(p=>p.month>0&&p.month<m).reduce((s,p)=>s+p.tt,0);
+      // Nếu nợ đã tất toán trước tháng này → ẩn
+      if(d.ton>0&&cumTT_prev>=d.ton) return;
+
+      // KH cố định
       const kh=d.kh||0;
-      // TT của tháng m (lọc payment có month===m)
+      // TT tháng m
       const pays=d.payments.filter(p=>p.month===m);
       const tt=pays.reduce((s,p)=>s+p.tt,0);
       // Ngày TT trong tháng
-      const lastPay=pays[0]||null;
-      const ngay=lastPay?lastPay.ngay:'';
-      const conlai=d.ton-tt;
+      const ngay=pays[0]?pays[0].ngay:'';
+      // CN Còn Tồn = tồn - tổng TT đến tháng m
+      const cumTT_curr=cumTT_prev+tt;
+      const conTon=Math.max(0,d.ton-cumTT_curr);
+
       const pct=kh>0?(tt/kh*100):null;
       const pctTxt=pct!==null?pct.toFixed(1)+'%':'–';
       const pctCol=pct===null?'#aaa':pct>=100?'#1a6b3c':pct>=70?'#d69e2e':'#e53e3e';
@@ -3456,24 +3464,28 @@ function renderBadDebt(){
       if(tt>=kh&&kh>0){badge='✅ Hoàn thành';bbg='#e8f5ee';bcl='#1a6b3c';}
       else if(tt===0){badge='⚠️ Chưa thanh toán';bbg='#fff0f0';bcl='#c53030';}
       else{badge='🟡 Ít hơn KH';bbg='#fffbea';bcl='#7a5800';}
-      totTon+=d.ton;totKH+=kh;totTT+=tt;
+
+      totTon+=d.ton;totKH+=kh;totTT+=tt;totConTon+=conTon;
+      rowNum++;
+
       // Header phân loại
       if(d.loai&&d.loai!==curLoai){
         curLoai=d.loai;loaiIdx++;
         const lbg=loaiIdx%2===1?'#e8f5ee':'#ebf8ff';
         const lcl=loaiIdx%2===1?'#1a6b3c':'#2b6cb0';
         tb+=`<tr style="background:${lbg}">
-          <td colspan="8" style="padding:8px 12px;font-weight:700;font-size:12px;color:${lcl};letter-spacing:.5px">${d.loai}</td>
+          <td colspan="9" style="padding:8px 12px;font-weight:700;font-size:12px;color:${lcl};letter-spacing:.5px">${d.loai}</td>
         </tr>`;
       }
       tb+=`<tr>
-        <td style="text-align:center;color:#aaa;font-size:11px">${i+1}</td>
+        <td style="text-align:center;color:#aaa;font-size:11px">${rowNum}</td>
         <td style="font-weight:600">${d.ten||'–'}</td>
         <td style="text-align:right;font-weight:700;color:#c53030">${fB(d.ton)}</td>
         <td style="text-align:right">${fB(kh)}</td>
         <td style="text-align:right;font-weight:700;color:#1a6b3c">${fB(tt)}</td>
         <td style="text-align:center;font-size:11px;color:#555">${fD(ngay)}</td>
         <td style="text-align:center;font-weight:700;color:${pctCol}">${pctTxt}</td>
+        <td style="text-align:right;font-weight:700;color:${conTon===0?'#1a6b3c':'#c53030'}">${fB(conTon)}</td>
         <td style="text-align:center"><span style="background:${bbg};color:${bcl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${badge}</span></td>
       </tr>`;
     });
@@ -3486,6 +3498,7 @@ function renderBadDebt(){
       <td style="text-align:right;color:#1a6b3c">${fB(totTT)}</td>
       <td></td>
       <td style="text-align:center;color:${tcol}">${totPct!==null?totPct.toFixed(1)+'%':'–'}</td>
+      <td style="text-align:right;color:#c53030">${fB(totConTon)}</td>
       <td></td>
     </tr>`;
   }
