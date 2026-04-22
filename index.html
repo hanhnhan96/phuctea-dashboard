@@ -3440,7 +3440,7 @@ function renderBadDebt(){
     const cumPrev=d.payments.filter(p=>p.month>0&&p.month<m).reduce((s,p)=>s+p.tt,0);
     if(d.ton>0&&cumPrev>=d.ton) return 99; // sẽ bị ẩn
     const tt=d.payments.filter(p=>p.month===m).reduce((s,p)=>s+p.tt,0);
-    if(tt>=NX_KH_FIXED) return 0;   // Hoàn thành
+    if(tt>=(d.kh||0)&&(d.kh||0)>0) return 0;   // Hoàn thành
     if(tt>0) return 1;              // Ít hơn KH
     return 2;                       // Chưa thanh toán
   }
@@ -3458,8 +3458,8 @@ function renderBadDebt(){
       // Nếu nợ đã tất toán trước tháng này → ẩn
       if(d.ton>0&&cumTT_prev>=d.ton) return;
 
-      // KH cố định 25tr/tháng
-      const kh=NX_KH_FIXED;
+      // KH theo cột Q của từng cửa hàng
+      const kh=d.kh||0;
       // TT tháng m
       const pays=d.payments.filter(p=>p.month===m);
       const tt=pays.reduce((s,p)=>s+p.tt,0);
@@ -3501,12 +3501,12 @@ function renderBadDebt(){
         <td style="text-align:center"><span style="background:${bbg};color:${bcl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${badge}</span></td>
       </tr>`;
     });
-    const totPct=totKH>0?(totTT/totKH*100):null;
+    const totPct=NX_KH_FIXED>0?(totTT/NX_KH_FIXED*100):null;
     const tcol=totPct===null?'#aaa':totPct>=100?'#1a6b3c':totPct>=70?'#d69e2e':'#e53e3e';
     tb+=`<tr style="background:#f0f7f2;font-weight:700;border-top:2px solid var(--g)">
       <td colspan="2" style="padding:8px 12px">TỔNG CỘNG</td>
       <td style="text-align:right;color:#c53030">${fB(totTon)}</td>
-      <td style="text-align:right">${fB(totKH)}</td>
+      <td style="text-align:right">${fB(NX_KH_FIXED)}</td>
       <td style="text-align:right;color:#1a6b3c">${fB(totTT)}</td>
       <td></td>
       <td style="text-align:center;color:${tcol}">${totPct!==null?totPct.toFixed(1)+'%':'–'}</td>
@@ -3518,10 +3518,10 @@ function renderBadDebt(){
 
   // Summary chips
   const chip=(t,bg,cl)=>`<span style="background:${bg};color:${cl};padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700">${t}</span>`;
-  const totPctFmt=totKH>0?(totTT/totKH*100).toFixed(1)+'%':'–';
+  const totPctFmt=NX_KH_FIXED>0?(totTT/NX_KH_FIXED*100).toFixed(1)+'%':'–';
   document.getElementById('nxSummary').innerHTML=
     chip(`💰 Tổng tồn 2025: ${fB(totTon)}`,'#fff0f0','#c53030')+' '+
-    chip(`📋 KH T${m}: ${fB(totKH)}`,'#fff8e6','#7a5800')+' '+
+    chip(`📋 KH T${m}: ${fB(NX_KH_FIXED)}`,'#fff8e6','#7a5800')+' '+
     chip(`✅ TT T${m}: ${fB(totTT)}`,'#e8f5ee','#1a6b3c')+' '+
     chip(`📊 Đạt: ${totPctFmt}`,'#ebf8ff','#2b6cb0')+' '+
     chip(`📅 Tháng ${m}/${new Date().getFullYear()}`,'#f8fafc','#555');
