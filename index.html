@@ -899,7 +899,7 @@ tr:last-child td{border-bottom:none}
   <p class="stitle">💸 Theo dõi Nợ xấu – Kế hoạch Thu hồi</p>
   <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px">
     <div class="fg">
-      <label>Lũy kế đến tháng</label>
+      <label>Tháng</label>
       <select id="nxMonth" class="filter-sel" onchange="renderBadDebt()">
         <option value="1">T1</option><option value="2">T2</option><option value="3">T3</option>
         <option value="4">T4</option><option value="5">T5</option><option value="6">T6</option>
@@ -3443,13 +3443,13 @@ function renderBadDebt(){
     tb='<tr><td colspan="8" style="text-align:center;color:#aaa;padding:24px">Chưa có dữ liệu – nhấn 🔄 Tải lại</td></tr>';
   } else {
     _badDebtData.forEach((d,i)=>{
-      // Lũy kế KH từ T1 đến tháng m
-      const kh=d.khArr.slice(0,m).reduce((s,v)=>s+v,0);
-      // Lũy kế TT từ T1 đến tháng m (lọc theo month ≤ m)
-      const pays=d.payments.filter(p=>p.month>0&&p.month<=m);
+      // KH của tháng m (cột Q+m-1)
+      const kh=d.khArr[m-1]||0;
+      // TT của tháng m (lọc payment có month===m)
+      const pays=d.payments.filter(p=>p.month===m);
       const tt=pays.reduce((s,p)=>s+p.tt,0);
-      // Ngày TT gần nhất trong khoảng
-      const lastPay=pays.sort((a,b)=>b.month-a.month)[0];
+      // Ngày TT trong tháng
+      const lastPay=pays[0]||null;
       const ngay=lastPay?lastPay.ngay:'';
       const conlai=d.ton-tt;
       const pct=kh>0?(tt/kh*100):null;
@@ -3503,7 +3503,8 @@ function renderBadDebt(){
     chip(`💰 Tổng tồn 2026: ${fB(totTon)}`,'#fff0f0','#c53030')+' '+
     chip(`📋 KH T${m}: ${fB(totKH)}`,'#fff8e6','#7a5800')+' '+
     chip(`✅ TT T${m}: ${fB(totTT)}`,'#e8f5ee','#1a6b3c')+' '+
-    chip(`📊 Đạt: ${totPctFmt}`,'#ebf8ff','#2b6cb0');
+    chip(`📊 Đạt: ${totPctFmt}`,'#ebf8ff','#2b6cb0')+' '+
+    chip(`📅 Tháng ${m}/${new Date().getFullYear()}`,'#f8fafc','#555');
   const nxNote=document.getElementById('nxNote');
   if(nxNote) nxNote.textContent='';
 }
