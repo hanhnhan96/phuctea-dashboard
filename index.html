@@ -3453,11 +3453,9 @@ function renderBadDebt(){
       const pctTxt=pct!==null?pct.toFixed(1)+'%':'–';
       const pctCol=pct===null?'#aaa':pct>=100?'#1a6b3c':pct>=70?'#d69e2e':'#e53e3e';
       let badge='',bbg='',bcl='';
-      if(tt===0&&kh>0){badge='⚠️ Chưa thu';bbg='#fff0f0';bcl='#c53030';}
-      else if(pct!==null&&pct>=100){badge='✅ Hoàn thành';bbg='#e8f5ee';bcl='#1a6b3c';}
-      else if(pct!==null&&pct>=70){badge='🟡 Đang thu';bbg='#fffbea';bcl='#7a5800';}
-      else if(tt>0){badge='🔴 Thiếu';bbg='#fff0f0';bcl='#c53030';}
-      else{badge='–';bbg='#f8fafc';bcl='#aaa';}
+      if(tt>=kh&&kh>0){badge='✅ Hoàn thành';bbg='#e8f5ee';bcl='#1a6b3c';}
+      else if(tt===0){badge='⚠️ Chưa thanh toán';bbg='#fff0f0';bcl='#c53030';}
+      else{badge='🟡 Ít hơn KH';bbg='#fffbea';bcl='#7a5800';}
       totTon+=d.ton;totKH+=kh;totTT+=tt;
       // Header phân loại
       if(d.loai&&d.loai!==curLoai){
