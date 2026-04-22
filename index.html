@@ -915,7 +915,7 @@ tr:last-child td{border-bottom:none}
       <thead><tr>
         <th style="text-align:center">#</th>
         <th style="text-align:left">Phân loại / Cửa hàng</th>
-        <th style="text-align:right">Tồn nợ 2026</th>
+        <th style="text-align:right">Tồn Nợ 2025</th>
         <th style="text-align:right">KH tháng</th>
         <th style="text-align:right">TT thực tế</th>
         <th style="text-align:center">Ngày TT</th>
@@ -3374,7 +3374,7 @@ let _badDebtData=[];
 let _badDebtHeaders=[];
 
 // Cấu trúc 2 loại row:
-// [Store row]   N(13)=Phân Loại, O(14)=Tên CH, P(15)=Tồn nợ 2026
+// [Store row]   N(13)=Phân Loại, O(14)=Tên CH, P(15)=Tồn Nợ 2025
 //               Q(16)=KH T1, R(17)=KH T2, S(18)=KH T3 … (mỗi tháng 1 cột)
 // [Payment row] J(9)=Ngày TT, K(10)=Số TT, L(11)=Tên CH (map với O)
 const NX_I_NGAY=9, NX_I_TT_AMT=10, NX_I_TT_TEN=11;
@@ -3508,7 +3508,7 @@ function renderBadDebt(){
   const chip=(t,bg,cl)=>`<span style="background:${bg};color:${cl};padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700">${t}</span>`;
   const totPctFmt=totKH>0?(totTT/totKH*100).toFixed(1)+'%':'–';
   document.getElementById('nxSummary').innerHTML=
-    chip(`💰 Tổng tồn 2026: ${fB(totTon)}`,'#fff0f0','#c53030')+' '+
+    chip(`💰 Tổng tồn 2025: ${fB(totTon)}`,'#fff0f0','#c53030')+' '+
     chip(`📋 KH T${m}: ${fB(totKH)}`,'#fff8e6','#7a5800')+' '+
     chip(`✅ TT T${m}: ${fB(totTT)}`,'#e8f5ee','#1a6b3c')+' '+
     chip(`📊 Đạt: ${totPctFmt}`,'#ebf8ff','#2b6cb0')+' '+
