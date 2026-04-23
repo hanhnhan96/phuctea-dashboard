@@ -3814,7 +3814,7 @@ function computePlan(){
       const variants=[...p.variants]; // tên gốc các biến thể đã gộp
       return{ten,cat:p.cat,dtHist:p.dt,slHist:p.sl,dtTB,slTB,avgPrice,share,planDT,planSL,nMonthsData:p.monthSet.size,variants};
     })
-    .sort((a,b)=>b.planDT-a.planDT);
+    .sort((a,b)=>(a.cat||'').localeCompare(b.cat||'')||b.planDT-a.planDT);
 
   // Lưu meta
   _planData._meta={targetDT,targetMonth,targetYear,lookback,selectedCats,refMonths,smartMerge};
