@@ -981,8 +981,17 @@ tr:last-child td{border-bottom:none}
         <div id="planCatList" style="padding:6px 4px"></div>
       </div>
     </div>
-    <button class="btn" style="padding:8px 20px;font-size:13px" onclick="computePlan()">🚀 Lập kế hoạch</button>
-    <button id="planExportBtn" class="btn" style="padding:8px 20px;font-size:13px;background:#2b6cb0;display:none" onclick="exportPlanExcel()">⬇️ Tải Excel</button>
+    <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;font-weight:600;color:#1a6b3c;background:#e8f5ee;border:1px solid #b7dfc8;border-radius:6px;padding:5px 10px;white-space:nowrap">
+        <input type="checkbox" id="planSmartMerge" checked style="width:14px;height:14px;accent-color:#1a6b3c;cursor:pointer">
+        🧠 Gộp biến thể thông minh
+      </label>
+      <div style="font-size:10px;color:#555;padding-left:2px">VD: Tết/Noel/năm/màu → 1 SP</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;justify-content:flex-end">
+      <button class="btn" style="padding:8px 20px;font-size:13px" onclick="computePlan()">🚀 Lập kế hoạch</button>
+      <button id="planExportBtn" class="btn" style="padding:8px 20px;font-size:13px;background:#2b6cb0;display:none" onclick="exportPlanExcel()">⬇️ Tải Excel</button>
+    </div>
   </div>
 
   <!-- Summary chips -->
@@ -3644,6 +3653,24 @@ function renderBadDebt(){
 // ===== KẾ HOẠCH SẢN LƯỢNG =====
 let _planData=[], _planChartInst=null;
 
+// === Smart product name normalization ===
+function normalizeSPName(name){
+  if(!name) return '';
+  return name
+    // 1. Xoá nội dung trong ngoặc đơn (Tết, Noel, Mùa Xuân, phiên bản, v.v.)
+    .replace(/\s*\([^)]*\)/g,'')
+    // 2. Xoá mã ngày tháng dạng 25.01 / 26.02 / 25.05 (yy.mm) ở bất kỳ đâu trong tên
+    .replace(/\s+\d{2}\.\d{2}(?:\.\d{2})?(?=\s|$)/g,'')
+    // 3. Xoá năm dạng 2024 / 2025 / 2026
+    .replace(/\s+20\d{2}(?=\s|$)/g,'')
+    // 4. Xoá "In N Màu" – biến thể số màu in (In 1 Màu, In 2 Màu, In 5 Màu...)
+    .replace(/\s+In\s+\d+\s+Màu/gi,'')
+    // 5. Xoá các nhãn mùa/sự kiện đứng riêng ở cuối tên (không trong ngoặc)
+    .replace(/\s+(Tết|Noel|Halloween|Trung Thu|Giáng Sinh|Valentine|Xuân|Mùa Xuân|Hè|Thu Đông)$/gi,'')
+    // 6. Chuẩn hoá khoảng trắng
+    .replace(/\s+/g,' ').trim();
+}
+
 // === Helpers checkbox nhóm hàng ===
 function togglePlanCatDrop(){
   const d=document.getElementById('planCatDrop');
@@ -3714,6 +3741,7 @@ function computePlan(){
   const targetYear=parseInt(document.getElementById('planYear')?.value||new Date().getFullYear());
   const lookback=parseInt(document.getElementById('planLookback')?.value||6);
   const selectedCats=getSelectedPlanCats();
+  const smartMerge=document.getElementById('planSmartMerge')?.checked!==false;
 
   if(targetDT<=0){
     alert('Vui lòng nhập Doanh thu dự kiến (lớn hơn 0).');
@@ -3736,7 +3764,6 @@ function computePlan(){
     refMonths.push({m,y});
   }
 
-  // Kiểm tra có đủ data cho tất cả cats không
   const allCats=[...new Set(D_ALL.map(r=>r.loaiHang).filter(Boolean))];
   const validCats=selectedCats.filter(c=>allCats.includes(c));
 
@@ -3752,14 +3779,23 @@ function computePlan(){
     return;
   }
 
-  // Tổng hợp theo sản phẩm
+  // Tổng hợp theo sản phẩm (có thể gộp biến thể)
   const prodMap={};
   hist.forEach(r=>{
-    const k=r.sanPham||'(Không xác định)';
-    if(!prodMap[k]) prodMap[k]={cat:r.loaiHang||'Khác',dt:0,sl:0,monthSet:new Set()};
+    const rawName=r.sanPham||'(Không xác định)';
+    const k=smartMerge?normalizeSPName(rawName):rawName;
+    if(!prodMap[k]){
+      prodMap[k]={
+        cat:r.loaiHang||'Khác',
+        dt:0,sl:0,
+        monthSet:new Set(),
+        variants:new Set()  // tên gốc các biến thể
+      };
+    }
     prodMap[k].dt+=(r.thanhTien||0);
     prodMap[k].sl+=(r.sl||0);
     prodMap[k].monthSet.add(`${r.nam}-${r.thang}`);
+    if(rawName!==k) prodMap[k].variants.add(rawName);
   });
 
   const totalDT=Object.values(prodMap).reduce((s,p)=>s+p.dt,0);
@@ -3775,12 +3811,13 @@ function computePlan(){
       const slTB=p.sl/nMonths; // SL TB mỗi tháng
       const planDT=targetDT*share;
       const planSL=avgPrice>0?Math.round(planDT/avgPrice):0;
-      return{ten,cat:p.cat,dtHist:p.dt,slHist:p.sl,dtTB,slTB,avgPrice,share,planDT,planSL,nMonthsData:p.monthSet.size};
+      const variants=[...p.variants]; // tên gốc các biến thể đã gộp
+      return{ten,cat:p.cat,dtHist:p.dt,slHist:p.sl,dtTB,slTB,avgPrice,share,planDT,planSL,nMonthsData:p.monthSet.size,variants};
     })
     .sort((a,b)=>b.planDT-a.planDT);
 
   // Lưu meta
-  _planData._meta={targetDT,targetMonth,targetYear,lookback,selectedCats,refMonths};
+  _planData._meta={targetDT,targetMonth,targetYear,lookback,selectedCats,refMonths,smartMerge};
   renderPlanSummary();
   renderPlanTable();
   renderPlanChart();
@@ -3799,14 +3836,16 @@ function renderPlanSummary(){
   const mn=meta.targetMonth?`T${meta.targetMonth}/${meta.targetYear}`:'';
   const selCatsAll=[...document.querySelectorAll('.plan-cat-cb')];
   const catChip=cats.length===selCatsAll.length?'Tất cả nhóm hàng':`${cats.length} nhóm hàng`;
+  const mergedCount=_planData.filter(p=>p.variants&&p.variants.length>0).length;
+  const mergeChip=meta.smartMerge&&mergedCount>0?` `+chip(`🧠 Đã gộp ${mergedCount} biến thể`,'#f0f9ff','#1a6b3c'):'';
   document.getElementById('planSummary').innerHTML=
     chip(`💰 DT dự kiến ${mn}: ${fB(meta.targetDT||0)}`,'#fff8e6','#7a5800')+' '+
     chip(`📦 SL kế hoạch: ${fB(totalPlanSL)} SP`,'#e8f5ee','#1a6b3c')+' '+
     chip(`🏷️ ${_planData.length} sản phẩm`,'#ebf8ff','#2b6cb0')+' '+
     chip(`🗂️ ${catChip}`,'#f3e8ff','#6b21a8')+' '+
-    chip(`📅 Phân tích ${meta.lookback||6} tháng gần nhất`,'#f8fafc','#555');
+    chip(`📅 Phân tích ${meta.lookback||6} tháng gần nhất`,'#f8fafc','#555')+mergeChip;
   document.getElementById('planSubtitle').textContent=
-    `Dựa trên dữ liệu ${meta.lookback||6} tháng • ${_planData.length} sản phẩm • DT dự kiến: ${fB(meta.targetDT||0)} đ`;
+    `Dựa trên dữ liệu ${meta.lookback||6} tháng • ${_planData.length} sản phẩm${meta.smartMerge&&mergedCount?` (đã gộp ${mergedCount} biến thể)`:''} • DT dự kiến: ${fB(meta.targetDT||0)} đ`;
 }
 
 function renderPlanTable(){
@@ -3839,7 +3878,10 @@ function renderPlanTable(){
     const barW=Math.min(100,p.share*100*5);
     tb+=`<tr>
       <td style="text-align:center;color:#aaa;font-size:11px">${rowNum}</td>
-      <td style="font-weight:600">${p.ten}</td>
+      <td style="font-weight:600">
+        ${p.ten}
+        ${p.variants&&p.variants.length>0?`<span title="${p.variants.join('\n')}" style="margin-left:5px;background:#e0f0ff;color:#2b6cb0;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;cursor:help">+${p.variants.length} biến thể</span>`:''}
+      </td>
       <td><span style="background:${nhomColors[p.cat]||'#eee'}22;color:${nhomColors[p.cat]||'#555'};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid ${nhomColors[p.cat]||'#ccc'}44">${p.cat}</span></td>
       <td style="text-align:right;color:#555">${fB(p.dtTB)}</td>
       <td style="text-align:right;color:#2b6cb0;font-weight:600">${fB(p.avgPrice)}</td>
