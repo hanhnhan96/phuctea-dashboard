@@ -1013,12 +1013,16 @@ tr:last-child td{border-bottom:none}
         </div>
         <div style="display:flex;gap:8px;align-items:center">
           <input id="planSearch" type="text" placeholder="🔍 Tìm sản phẩm..." style="border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;font-size:12px;outline:none;width:200px" oninput="renderPlanTable()">
+          <button onclick="planSelectAllProd(true)" style="border:1px solid #b7dfc8;border-radius:5px;padding:4px 10px;font-size:11px;background:#e8f5ee;color:#1a6b3c;cursor:pointer;font-weight:700">✅ Chọn tất cả</button>
+          <button onclick="planSelectAllProd(false)" style="border:1px solid #fecaca;border-radius:5px;padding:4px 10px;font-size:11px;background:#fff0f0;color:#c53030;cursor:pointer;font-weight:700">☐ Bỏ tất cả</button>
+          <span id="planSelCount" style="font-size:11px;color:#555"></span>
         </div>
       </div>
       <div class="tbl-wrap" style="max-height:520px">
         <table id="planTable">
           <thead><tr>
-            <th style="text-align:center;width:36px">#</th>
+            <th style="text-align:center;width:32px"><input type="checkbox" id="planChkAll" checked title="Chọn/bỏ tất cả" style="width:14px;height:14px;accent-color:#1a6b3c;cursor:pointer" onchange="planSelectAllProd(this.checked)"></th>
+            <th style="text-align:center;width:28px">#</th>
             <th>Sản phẩm</th>
             <th>Nhóm hàng</th>
             <th style="text-align:right">DT TB/tháng</th>
@@ -3852,33 +3856,36 @@ function renderPlanTable(){
   const fB=n=>(!n||isNaN(n))?'–':new Intl.NumberFormat('vi-VN').format(Math.round(n));
   const search=(document.getElementById('planSearch')?.value||'').toLowerCase().trim();
 
-  let rows=_planData.filter(p=>{
-    if(search&&!(p.ten.toLowerCase().includes(search)||p.cat.toLowerCase().includes(search))) return false;
-    return true;
-  });
-
   const nhomColors={};
   const palette=['#1a6b3c','#2b6cb0','#d69e2e','#c53030','#6b21a8','#2c7a7b','#c05621','#2d3748'];
   [...new Set(_planData.map(p=>p.cat))].sort().forEach((c,i)=>nhomColors[c]=palette[i%palette.length]);
 
-  let tb='',curCat='',rowNum=0;
-  let totDtTB=0,totSlTB=0,totPlanDT=0,totPlanSL=0;
+  // Lấy trạng thái selected hiện tại (nếu đã có trong _planData)
+  const prevSel={};
+  _planData.forEach(p=>prevSel[p.ten]=p.selected!==false);
 
-  rows.forEach(p=>{
+  let tb='',curCat='',rowNum=0;
+
+  _planData.forEach((p,idx)=>{
+    const visible=!search||(p.ten.toLowerCase().includes(search)||p.cat.toLowerCase().includes(search));
+    const sel=p.selected!==false;
     if(p.cat!==curCat){
       curCat=p.cat;
       const cl=nhomColors[p.cat]||'#555';
-      tb+=`<tr style="background:#f0f7f2">
-        <td colspan="9" style="padding:6px 12px;font-weight:700;font-size:11px;color:${cl};letter-spacing:.5px">📁 ${p.cat}</td>
+      tb+=`<tr class="plan-cat-hdr" data-cat="${p.cat}" style="background:#f0f7f2;${!visible?'display:none':''}">
+        <td colspan="10" style="padding:6px 12px;font-weight:700;font-size:11px;color:${cl};letter-spacing:.5px">📁 ${p.cat}</td>
       </tr>`;
     }
     rowNum++;
-    totDtTB+=p.dtTB;totSlTB+=p.slTB;totPlanDT+=p.planDT;totPlanSL+=p.planSL;
     const pctTxt=(p.share*100).toFixed(1)+'%';
     const barW=Math.min(100,p.share*100*5);
-    tb+=`<tr>
+    const rowStyle=sel?'':'opacity:.4;background:#fafafa';
+    tb+=`<tr data-idx="${idx}" style="${rowStyle}${!visible?';display:none':''}">
+      <td style="text-align:center">
+        <input type="checkbox" class="plan-prod-cb" data-idx="${idx}" ${sel?'checked':''} style="width:14px;height:14px;accent-color:#1a6b3c;cursor:pointer" onchange="onPlanProdCb(${idx},this.checked)">
+      </td>
       <td style="text-align:center;color:#aaa;font-size:11px">${rowNum}</td>
-      <td style="font-weight:600">
+      <td style="font-weight:600;${!sel?'color:#aaa':''}">
         ${p.ten}
         ${p.variants&&p.variants.length>0?`<span title="${p.variants.join('\n')}" style="margin-left:5px;background:#e0f0ff;color:#2b6cb0;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;cursor:help">+${p.variants.length} biến thể</span>`:''}
       </td>
@@ -3892,26 +3899,101 @@ function renderPlanTable(){
           <span style="font-size:11px;color:#1a6b3c;font-weight:700;min-width:36px;text-align:right">${pctTxt}</span>
         </div>
       </td>
-      <td style="text-align:right;font-weight:700;color:#d69e2e;background:#fffbea">${fB(p.planDT)}</td>
-      <td style="text-align:right;font-weight:700;color:#1a6b3c;background:#f0f7f2;font-size:14px">${fB(p.planSL)}</td>
+      <td id="planDT_${idx}" style="text-align:right;font-weight:700;color:${sel?'#d69e2e':'#aaa'};background:#fffbea">${sel?fB(p.planDT):'–'}</td>
+      <td id="planSL_${idx}" style="text-align:right;font-weight:700;color:${sel?'#1a6b3c':'#aaa'};background:#f0f7f2;font-size:14px">${sel?fB(p.planSL):'–'}</td>
     </tr>`;
   });
 
-  // Total row
-  if(rows.length){
-    tb+=`<tr style="background:#f0f7f2;font-weight:700;border-top:2px solid var(--g)">
-      <td colspan="3" style="padding:8px 12px">TỔNG CỘNG (${rowNum} SP)</td>
-      <td style="text-align:right">${fB(totDtTB)}</td>
-      <td></td>
-      <td style="text-align:right">${fB(totSlTB)}</td>
-      <td></td>
-      <td style="text-align:right;color:#d69e2e;background:#fffbea">${fB(totPlanDT)}</td>
-      <td style="text-align:right;color:#1a6b3c;background:#f0f7f2;font-size:14px">${fB(totPlanSL)}</td>
-    </tr>`;
-  } else {
-    tb='<tr><td colspan="9" style="text-align:center;color:#aaa;padding:30px">Không tìm thấy sản phẩm</td></tr>';
-  }
+  // Total row (id để update in-place)
+  tb+=`<tr id="planTotRow" style="background:#f0f7f2;font-weight:700;border-top:2px solid var(--g)">
+    <td colspan="4" style="padding:8px 12px">TỔNG CỘNG (<span id="planTotCount">0</span> SP được chọn)</td>
+    <td id="planTotDtTB" style="text-align:right">–</td>
+    <td></td>
+    <td id="planTotSlTB" style="text-align:right">–</td>
+    <td></td>
+    <td id="planTotDT" style="text-align:right;color:#d69e2e;background:#fffbea">–</td>
+    <td id="planTotSL" style="text-align:right;color:#1a6b3c;background:#f0f7f2;font-size:14px">–</td>
+  </tr>`;
+
   document.getElementById('planTbody').innerHTML=tb;
+  updatePlanFromSelection(); // tính lại DT/SL theo lựa chọn
+}
+
+// Khi tick/bỏ tick 1 sản phẩm
+function onPlanProdCb(idx, checked){
+  if(_planData[idx]) _planData[idx].selected=checked;
+  updatePlanFromSelection();
+}
+
+// Chọn/bỏ tất cả sản phẩm (hoặc chỉ những sản phẩm đang hiển thị)
+function planSelectAllProd(val){
+  document.querySelectorAll('.plan-prod-cb').forEach(cb=>{
+    const i=parseInt(cb.dataset.idx);
+    cb.checked=val;
+    if(_planData[i]) _planData[i].selected=val;
+  });
+  const ca=document.getElementById('planChkAll');
+  if(ca) ca.checked=val;
+  updatePlanFromSelection();
+}
+
+// Tính lại DT/SL cho các sản phẩm được chọn, phân bổ lại tỷ trọng
+function updatePlanFromSelection(){
+  const fB=n=>(!n||isNaN(n))?'–':new Intl.NumberFormat('vi-VN').format(Math.round(n));
+  const meta=_planData._meta||{};
+  const targetDT=meta.targetDT||0;
+
+  // Tổng share của sản phẩm được chọn
+  const selItems=_planData.filter(p=>p.selected!==false);
+  const totShareSel=selItems.reduce((s,p)=>s+p.share,0);
+
+  let totDtTB=0,totSlTB=0,totPlanDT=0,totPlanSL=0;
+
+  _planData.forEach((p,idx)=>{
+    const sel=p.selected!==false;
+    const adjShare=totShareSel>0&&sel?p.share/totShareSel:0;
+    const adjPlanDT=targetDT*adjShare;
+    const adjPlanSL=p.avgPrice>0?Math.round(adjPlanDT/p.avgPrice):0;
+
+    const dtCell=document.getElementById(`planDT_${idx}`);
+    const slCell=document.getElementById(`planSL_${idx}`);
+    const row=document.querySelector(`tr[data-idx="${idx}"]`);
+
+    if(dtCell) dtCell.textContent=sel?fB(adjPlanDT):'–';
+    if(dtCell) dtCell.style.color=sel?'#d69e2e':'#aaa';
+    if(slCell) slCell.textContent=sel?fB(adjPlanSL):'–';
+    if(slCell) slCell.style.color=sel?'#1a6b3c':'#aaa';
+    if(row){ row.style.opacity=sel?'':'0.4'; row.style.background=sel?'':'#fafafa'; }
+
+    if(sel){
+      totDtTB+=p.dtTB; totSlTB+=p.slTB;
+      totPlanDT+=adjPlanDT; totPlanSL+=adjPlanSL;
+    }
+  });
+
+  // Cập nhật dòng tổng
+  const tc=document.getElementById('planTotCount');
+  const tdt=document.getElementById('planTotDtTB');
+  const tsl=document.getElementById('planTotSlTB');
+  const tpdt=document.getElementById('planTotDT');
+  const tpsl=document.getElementById('planTotSL');
+  if(tc) tc.textContent=selItems.length;
+  if(tdt) tdt.textContent=fB(totDtTB);
+  if(tsl) tsl.textContent=fB(totSlTB);
+  if(tpdt) tpdt.textContent=fB(totPlanDT);
+  if(tpsl) tpsl.textContent=fB(totPlanSL);
+
+  // Cập nhật chip tổng SL
+  const chip=document.querySelector('#planSummary span:nth-child(2)');
+  // Cập nhật selCount
+  const sc=document.getElementById('planSelCount');
+  if(sc) sc.textContent=`${selItems.length}/${_planData.length} SP được chọn`;
+  // Cập nhật master checkbox trạng thái
+  const ca=document.getElementById('planChkAll');
+  if(ca){
+    ca.checked=selItems.length===_planData.length;
+    ca.indeterminate=selItems.length>0&&selItems.length<_planData.length;
+  }
 }
 
 function renderPlanChart(){
