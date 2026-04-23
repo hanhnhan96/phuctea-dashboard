@@ -4048,45 +4048,68 @@ function exportPlanExcel(){
   const fV=n=>isNaN(n)?0:Math.round(n);
   const wb=XLSX.utils.book_new();
 
+  // Chỉ lấy các sản phẩm đã được tick
+  const selItems=_planData.filter(p=>p.selected!==false);
+  if(!selItems.length){alert('Vui lòng chọn ít nhất 1 sản phẩm.');return;}
+
+  // Tính lại DT/SL theo phân bổ thực tế (như updatePlanFromSelection)
+  const totShareSel=selItems.reduce((s,p)=>s+p.share,0);
+  const targetDT=meta.targetDT||0;
+  const enriched=selItems.map(p=>{
+    const adjShare=totShareSel>0?p.share/totShareSel:0;
+    const adjPlanDT=targetDT*adjShare;
+    const adjPlanSL=p.avgPrice>0?Math.round(adjPlanDT/p.avgPrice):0;
+    return{...p,adjPlanDT,adjPlanSL,adjShare};
+  });
+
   // Sheet 1: Chi tiết
   const header=['#','Sản phẩm','Nhóm hàng','DT TB/tháng (VNĐ)','Đơn giá TB (VNĐ)','SL TB/tháng','Tỷ trọng (%)','DT dự kiến (VNĐ)','SL kế hoạch'];
-  const wsData=[header];
+  const wsData=[
+    [`Kế hoạch T${meta.targetMonth||''}/${meta.targetYear||''} – DT dự kiến: ${(targetDT).toLocaleString('vi-VN')} đ – ${enriched.length} sản phẩm`],
+    [],
+    header
+  ];
   let curCat='',n=0;
-  _planData.forEach(p=>{
+  enriched.forEach(p=>{
     if(p.cat!==curCat){curCat=p.cat;wsData.push([`📁 ${p.cat}`,'','','','','','','','']);}
     n++;
-    wsData.push([n,p.ten,p.cat,fV(p.dtTB),fV(p.avgPrice),fV(p.slTB),parseFloat((p.share*100).toFixed(2)),fV(p.planDT),p.planSL]);
+    wsData.push([
+      n, p.ten, p.cat,
+      fV(p.dtTB), fV(p.avgPrice), fV(p.slTB),
+      parseFloat((p.adjShare*100).toFixed(2)),
+      fV(p.adjPlanDT), p.adjPlanSL
+    ]);
   });
-  // Total
-  wsData.push(['','TỔNG CỘNG','',
-    fV(_planData.reduce((s,p)=>s+p.dtTB,0)),'',
-    fV(_planData.reduce((s,p)=>s+p.slTB,0)),'',
-    fV(_planData.reduce((s,p)=>s+p.planDT,0)),
-    _planData.reduce((s,p)=>s+p.planSL,0)
+  // Dòng tổng
+  wsData.push([
+    '','TỔNG CỘNG','',
+    fV(enriched.reduce((s,p)=>s+p.dtTB,0)),'',
+    fV(enriched.reduce((s,p)=>s+p.slTB,0)),'',
+    fV(enriched.reduce((s,p)=>s+p.adjPlanDT,0)),
+    enriched.reduce((s,p)=>s+p.adjPlanSL,0)
   ]);
 
   const ws=XLSX.utils.aoa_to_sheet(wsData);
-  // Column widths
   ws['!cols']=[{wch:5},{wch:45},{wch:25},{wch:20},{wch:18},{wch:15},{wch:12},{wch:20},{wch:15}];
   XLSX.utils.book_append_sheet(wb,ws,'Chi tiết SP');
 
-  // Sheet 2: Tóm tắt theo nhóm
+  // Sheet 2: Tóm tắt theo nhóm (chỉ SP đã chọn)
   const catMap={};
-  _planData.forEach(p=>{
+  enriched.forEach(p=>{
     if(!catMap[p.cat])catMap[p.cat]={dtTB:0,slTB:0,planDT:0,planSL:0,count:0};
-    catMap[p.cat].dtTB+=p.dtTB;catMap[p.cat].slTB+=p.slTB;
-    catMap[p.cat].planDT+=p.planDT;catMap[p.cat].planSL+=p.planSL;catMap[p.cat].count++;
+    catMap[p.cat].dtTB+=p.dtTB; catMap[p.cat].slTB+=p.slTB;
+    catMap[p.cat].planDT+=p.adjPlanDT; catMap[p.cat].planSL+=p.adjPlanSL; catMap[p.cat].count++;
   });
+  const totalPlanDT2=enriched.reduce((s,p)=>s+p.adjPlanDT,0);
   const ws2Data=[
-    [`Kế hoạch T${meta.targetMonth||''}/${meta.targetYear||''} – DT dự kiến: ${(meta.targetDT||0).toLocaleString('vi-VN')} đ`],
+    [`Kế hoạch T${meta.targetMonth||''}/${meta.targetYear||''} – DT dự kiến: ${targetDT.toLocaleString('vi-VN')} đ`],
     [],
     ['Nhóm hàng','Số SP','DT TB/tháng','DT dự kiến','SL kế hoạch','Tỷ trọng (%)']
   ];
-  const totalPlanDT2=Object.values(catMap).reduce((s,v)=>s+v.planDT,0);
   Object.entries(catMap).sort((a,b)=>b[1].planDT-a[1].planDT).forEach(([cat,v])=>{
     ws2Data.push([cat,v.count,fV(v.dtTB),fV(v.planDT),v.planSL,parseFloat((totalPlanDT2>0?v.planDT/totalPlanDT2*100:0).toFixed(2))]);
   });
-  ws2Data.push(['TỔNG',_planData.length,fV(Object.values(catMap).reduce((s,v)=>s+v.dtTB,0)),fV(totalPlanDT2),Object.values(catMap).reduce((s,v)=>s+v.planSL,0),100]);
+  ws2Data.push(['TỔNG',enriched.length,fV(enriched.reduce((s,p)=>s+p.dtTB,0)),fV(totalPlanDT2),enriched.reduce((s,p)=>s+p.adjPlanSL,0),100]);
   const ws2=XLSX.utils.aoa_to_sheet(ws2Data);
   ws2['!cols']=[{wch:25},{wch:8},{wch:20},{wch:20},{wch:15},{wch:14}];
   XLSX.utils.book_append_sheet(wb,ws2,'Tóm tắt nhóm hàng');
