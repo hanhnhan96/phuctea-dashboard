@@ -6,6 +6,7 @@
 <title>PHÚC TEA – Dashboard Kinh Doanh</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 .kpi-sheet-field{background:#e6f0ff!important;color:#1a4a8a!important;border:1px solid #3182ce!important;cursor:default!important;font-style:italic}
 .kpi-sheet-field::placeholder{color:#3182ce}
@@ -252,6 +253,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('yoy',this)">📈 So sánh YoY</div>
   <div class="tab" onclick="showTab('kpi',this)">🎯 KPI Mục tiêu</div>
   <div class="tab" onclick="showTab('noxau',this)">💸 Nợ xấu</div>
+  <div class="tab" onclick="showTab('plan',this)">📊 Kế hoạch SL</div>
 </div>
 
 <div class="main">
@@ -927,6 +929,98 @@ tr:last-child td{border-bottom:none}
     </table>
   </div>
   <div id="nxNote" style="margin-top:10px;font-size:11px;color:#aaa"></div>
+</div>
+
+<!-- ===== PAGE KẾ HOẠCH SẢN LƯỢNG ===== -->
+<div class="page" id="page-plan">
+  <p class="stitle">📊 Lập Kế Hoạch Sản Lượng theo Doanh Thu Dự Kiến</p>
+
+  <!-- Input panel -->
+  <div style="background:#f0f7f2;border:1px solid #b7dfc8;border-radius:12px;padding:18px 20px;margin-bottom:18px;display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#1a6b3c;margin-bottom:5px">📅 THÁNG KẾ HOẠCH</div>
+      <div style="display:flex;gap:6px">
+        <select id="planMonth" style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 10px;font-size:13px;outline:none;background:#fff">
+          <option value="1">Tháng 1</option><option value="2">Tháng 2</option><option value="3">Tháng 3</option>
+          <option value="4">Tháng 4</option><option value="5">Tháng 5</option><option value="6">Tháng 6</option>
+          <option value="7">Tháng 7</option><option value="8">Tháng 8</option><option value="9">Tháng 9</option>
+          <option value="10">Tháng 10</option><option value="11">Tháng 11</option><option value="12">Tháng 12</option>
+        </select>
+        <select id="planYear" style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 10px;font-size:13px;outline:none;background:#fff">
+          <option value="2026">2026</option><option value="2025">2025</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#1a6b3c;margin-bottom:5px">💰 DOANH THU DỰ KIẾN (VNĐ)</div>
+      <input id="planDT" type="text" placeholder="VD: 500,000,000"
+        style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 12px;font-size:14px;font-weight:700;width:220px;outline:none;background:#fff"
+        oninput="this.value=this.value.replace(/[^0-9]/g,'').replace(/\B(?=(\d{3})+(?!\d))/g,',')">
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#1a6b3c;margin-bottom:5px">📊 PHÂN TÍCH DỰA TRÊN</div>
+      <select id="planLookback" style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 10px;font-size:13px;outline:none;background:#fff">
+        <option value="3">3 tháng gần nhất</option>
+        <option value="6" selected>6 tháng gần nhất</option>
+        <option value="12">12 tháng gần nhất</option>
+      </select>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:700;color:#1a6b3c;margin-bottom:5px">🔍 LỌC NHÓM HÀNG</div>
+      <select id="planCat" style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 10px;font-size:13px;outline:none;background:#fff">
+        <option value="">-- Tất cả nhóm hàng --</option>
+      </select>
+    </div>
+    <button class="btn" style="padding:8px 20px;font-size:13px" onclick="computePlan()">🚀 Lập kế hoạch</button>
+    <button id="planExportBtn" class="btn" style="padding:8px 20px;font-size:13px;background:#2b6cb0;display:none" onclick="exportPlanExcel()">⬇️ Tải Excel</button>
+  </div>
+
+  <!-- Summary chips -->
+  <div id="planSummary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px"></div>
+
+  <!-- Chart + Table -->
+  <div id="planContent" style="display:none">
+    <!-- Top chart -->
+    <div class="cc" style="margin-bottom:16px">
+      <div class="ch"><div><div class="ctitle">Cơ cấu Doanh Thu Dự Kiến theo Nhóm Hàng</div></div></div>
+      <canvas id="planChart" height="80"></canvas>
+    </div>
+
+    <!-- Table -->
+    <div class="cc">
+      <div class="ch">
+        <div><div class="ctitle">Chi tiết Kế hoạch Sản lượng</div>
+          <div class="csub" id="planSubtitle"></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="planSearch" type="text" placeholder="🔍 Tìm sản phẩm..." style="border:1px solid var(--bdr);border-radius:6px;padding:5px 10px;font-size:12px;outline:none;width:200px" oninput="renderPlanTable()">
+        </div>
+      </div>
+      <div class="tbl-wrap" style="max-height:520px">
+        <table id="planTable">
+          <thead><tr>
+            <th style="text-align:center;width:36px">#</th>
+            <th>Sản phẩm</th>
+            <th>Nhóm hàng</th>
+            <th style="text-align:right">DT TB/tháng</th>
+            <th style="text-align:right">Đơn giá TB</th>
+            <th style="text-align:right">SL TB/tháng</th>
+            <th style="text-align:right">Tỷ trọng</th>
+            <th style="text-align:right;background:#fff8e6;color:#7a5800">DT dự kiến</th>
+            <th style="text-align:right;background:#e8f5ee;color:#1a6b3c">SL kế hoạch</th>
+          </tr></thead>
+          <tbody id="planTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty state -->
+  <div id="planEmpty" style="text-align:center;padding:60px 20px;color:#aaa">
+    <div style="font-size:48px;margin-bottom:12px">📊</div>
+    <div style="font-size:16px;font-weight:600;margin-bottom:6px">Nhập doanh thu dự kiến và nhấn "Lập kế hoạch"</div>
+    <div style="font-size:12px">Hệ thống sẽ phân tích dữ liệu lịch sử để đề xuất kế hoạch sản lượng theo từng sản phẩm</div>
+  </div>
 </div>
 
 </div><!-- /main -->
@@ -3015,6 +3109,14 @@ function showTab(name,el){
     if(sel&&!sel.dataset.init){sel.value=String(new Date().getMonth()+1);sel.dataset.init='1';}
     if(!_badDebtData.length) fetchBadDebt().then(renderBadDebt); else renderBadDebt();
   }
+  if(name==='plan'){
+    initPlanTab();
+    document.getElementById('planContent').style.display='none';
+    document.getElementById('planEmpty').style.display='block';
+    document.getElementById('planSummary').innerHTML='';
+    document.getElementById('planExportBtn').style.display='none';
+    _planData=[];
+  }
 }
 
 
@@ -3527,6 +3629,290 @@ function renderBadDebt(){
     chip(`📅 Tháng ${m}/${new Date().getFullYear()}`,'#f8fafc','#555');
   const nxNote=document.getElementById('nxNote');
   if(nxNote) nxNote.textContent='';
+}
+
+// ===== KẾ HOẠCH SẢN LƯỢNG =====
+let _planData=[], _planChartInst=null;
+
+function initPlanTab(){
+  // Set default tháng = tháng hiện tại + 1
+  const now=new Date();
+  let nm=now.getMonth()+2; let ny=now.getFullYear();
+  if(nm>12){nm=1;ny++;}
+  const pm=document.getElementById('planMonth');
+  const py=document.getElementById('planYear');
+  if(pm) pm.value=nm;
+  if(py){
+    [...py.options].forEach(o=>o.remove());
+    [ny,ny-1,ny+1].sort((a,b)=>b-a).forEach(y=>{
+      const o=document.createElement('option');o.value=y;o.textContent=y;
+      if(y===ny)o.selected=true;
+      py.appendChild(o);
+    });
+  }
+  // Populate category filter from D_ALL
+  const cats=[...new Set(D_ALL.map(r=>r.loaiHang).filter(Boolean))].sort();
+  const catSel=document.getElementById('planCat');
+  if(catSel){
+    catSel.innerHTML='<option value="">-- Tất cả nhóm hàng --</option>';
+    cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);});
+  }
+}
+
+function computePlan(){
+  const rawDT=(document.getElementById('planDT')?.value||'').replace(/,/g,'');
+  const targetDT=parseFloat(rawDT)||0;
+  const targetMonth=parseInt(document.getElementById('planMonth')?.value||new Date().getMonth()+2);
+  const targetYear=parseInt(document.getElementById('planYear')?.value||new Date().getFullYear());
+  const lookback=parseInt(document.getElementById('planLookback')?.value||6);
+  const catFilter=(document.getElementById('planCat')?.value||'').trim();
+
+  if(targetDT<=0){
+    alert('Vui lòng nhập Doanh thu dự kiến (lớn hơn 0).');
+    return;
+  }
+  if(!D_ALL.length){
+    alert('Chưa có dữ liệu. Vui lòng đợi dữ liệu tải xong.');
+    return;
+  }
+
+  // Tính N tháng gần nhất tính từ tháng trước tháng kế hoạch
+  const refMonths=[];
+  for(let i=1;i<=lookback;i++){
+    let m=targetMonth-i; let y=targetYear;
+    while(m<=0){m+=12;y--;}
+    refMonths.push({m,y});
+  }
+
+  // Lọc dữ liệu lịch sử
+  const hist=D_ALL.filter(r=>{
+    if(!r.sanPham||!r.thang||!r.nam) return false;
+    if(catFilter&&r.loaiHang!==catFilter) return false;
+    return refMonths.some(p=>r.nam===p.y&&r.thang===p.m);
+  });
+
+  if(!hist.length){
+    alert('Không có dữ liệu trong khoảng thời gian đã chọn.');
+    return;
+  }
+
+  // Tổng hợp theo sản phẩm
+  const prodMap={};
+  hist.forEach(r=>{
+    const k=r.sanPham||'(Không xác định)';
+    if(!prodMap[k]) prodMap[k]={cat:r.loaiHang||'Khác',dt:0,sl:0,monthSet:new Set()};
+    prodMap[k].dt+=(r.thanhTien||0);
+    prodMap[k].sl+=(r.sl||0);
+    prodMap[k].monthSet.add(`${r.nam}-${r.thang}`);
+  });
+
+  const totalDT=Object.values(prodMap).reduce((s,p)=>s+p.dt,0);
+  const nMonths=refMonths.length;
+
+  // Tính kế hoạch
+  _planData=Object.entries(prodMap)
+    .filter(([,p])=>p.sl>0&&p.dt>0)
+    .map(([ten,p])=>{
+      const share=totalDT>0?p.dt/totalDT:0;
+      const avgPrice=p.sl>0?p.dt/p.sl:0;
+      const dtTB=p.dt/nMonths; // DT TB mỗi tháng
+      const slTB=p.sl/nMonths; // SL TB mỗi tháng
+      const planDT=targetDT*share;
+      const planSL=avgPrice>0?Math.round(planDT/avgPrice):0;
+      return{ten,cat:p.cat,dtHist:p.dt,slHist:p.sl,dtTB,slTB,avgPrice,share,planDT,planSL,nMonthsData:p.monthSet.size};
+    })
+    .sort((a,b)=>b.planDT-a.planDT);
+
+  // Lưu meta
+  _planData._meta={targetDT,targetMonth,targetYear,lookback,catFilter,refMonths};
+  renderPlanSummary();
+  renderPlanTable();
+  renderPlanChart();
+  document.getElementById('planContent').style.display='block';
+  document.getElementById('planEmpty').style.display='none';
+  document.getElementById('planExportBtn').style.display='';
+}
+
+function renderPlanSummary(){
+  const meta=_planData._meta||{};
+  const fB=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
+  const chip=(t,bg,cl)=>`<span style="background:${bg};color:${cl};padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700">${t}</span>`;
+  const totalPlanDT=_planData.reduce((s,p)=>s+p.planDT,0);
+  const totalPlanSL=_planData.reduce((s,p)=>s+p.planSL,0);
+  const cats=[...new Set(_planData.map(p=>p.cat))];
+  const mn=meta.targetMonth?`T${meta.targetMonth}/${meta.targetYear}`:'';
+  document.getElementById('planSummary').innerHTML=
+    chip(`💰 DT dự kiến ${mn}: ${fB(meta.targetDT||0)}`,'#fff8e6','#7a5800')+' '+
+    chip(`📦 SL kế hoạch: ${fB(totalPlanSL)} SP`,'#e8f5ee','#1a6b3c')+' '+
+    chip(`🏷️ ${_planData.length} sản phẩm`,'#ebf8ff','#2b6cb0')+' '+
+    chip(`🗂️ ${cats.length} nhóm hàng`,'#f3e8ff','#6b21a8')+' '+
+    chip(`📅 Phân tích ${meta.lookback||6} tháng gần nhất`,'#f8fafc','#555');
+  document.getElementById('planSubtitle').textContent=
+    `Dựa trên dữ liệu ${meta.lookback||6} tháng • ${_planData.length} sản phẩm • DT dự kiến: ${fB(meta.targetDT||0)} đ`;
+}
+
+function renderPlanTable(){
+  const fB=n=>(!n||isNaN(n))?'–':new Intl.NumberFormat('vi-VN').format(Math.round(n));
+  const search=(document.getElementById('planSearch')?.value||'').toLowerCase().trim();
+  const catFilter=(document.getElementById('planCat')?.value||'').trim();
+
+  let rows=_planData.filter(p=>{
+    if(search&&!(p.ten.toLowerCase().includes(search)||p.cat.toLowerCase().includes(search))) return false;
+    if(catFilter&&p.cat!==catFilter) return false;
+    return true;
+  });
+
+  const nhomColors={};
+  const palette=['#1a6b3c','#2b6cb0','#d69e2e','#c53030','#6b21a8','#2c7a7b','#c05621','#2d3748'];
+  [...new Set(_planData.map(p=>p.cat))].sort().forEach((c,i)=>nhomColors[c]=palette[i%palette.length]);
+
+  let tb='',curCat='',rowNum=0;
+  let totDtTB=0,totSlTB=0,totPlanDT=0,totPlanSL=0;
+
+  rows.forEach(p=>{
+    if(p.cat!==curCat){
+      curCat=p.cat;
+      const cl=nhomColors[p.cat]||'#555';
+      tb+=`<tr style="background:#f0f7f2">
+        <td colspan="9" style="padding:6px 12px;font-weight:700;font-size:11px;color:${cl};letter-spacing:.5px">📁 ${p.cat}</td>
+      </tr>`;
+    }
+    rowNum++;
+    totDtTB+=p.dtTB;totSlTB+=p.slTB;totPlanDT+=p.planDT;totPlanSL+=p.planSL;
+    const pctTxt=(p.share*100).toFixed(1)+'%';
+    const barW=Math.min(100,p.share*100*5);
+    tb+=`<tr>
+      <td style="text-align:center;color:#aaa;font-size:11px">${rowNum}</td>
+      <td style="font-weight:600">${p.ten}</td>
+      <td><span style="background:${nhomColors[p.cat]||'#eee'}22;color:${nhomColors[p.cat]||'#555'};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700;border:1px solid ${nhomColors[p.cat]||'#ccc'}44">${p.cat}</span></td>
+      <td style="text-align:right;color:#555">${fB(p.dtTB)}</td>
+      <td style="text-align:right;color:#2b6cb0;font-weight:600">${fB(p.avgPrice)}</td>
+      <td style="text-align:right;color:#555">${fB(p.slTB)}</td>
+      <td style="text-align:right">
+        <div style="display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <div style="background:#e8f5ee;border-radius:3px;height:5px;width:60px"><div style="background:#1a6b3c;border-radius:3px;height:5px;width:${barW}%"></div></div>
+          <span style="font-size:11px;color:#1a6b3c;font-weight:700;min-width:36px;text-align:right">${pctTxt}</span>
+        </div>
+      </td>
+      <td style="text-align:right;font-weight:700;color:#d69e2e;background:#fffbea">${fB(p.planDT)}</td>
+      <td style="text-align:right;font-weight:700;color:#1a6b3c;background:#f0f7f2;font-size:14px">${fB(p.planSL)}</td>
+    </tr>`;
+  });
+
+  // Total row
+  if(rows.length){
+    tb+=`<tr style="background:#f0f7f2;font-weight:700;border-top:2px solid var(--g)">
+      <td colspan="3" style="padding:8px 12px">TỔNG CỘNG (${rowNum} SP)</td>
+      <td style="text-align:right">${fB(totDtTB)}</td>
+      <td></td>
+      <td style="text-align:right">${fB(totSlTB)}</td>
+      <td></td>
+      <td style="text-align:right;color:#d69e2e;background:#fffbea">${fB(totPlanDT)}</td>
+      <td style="text-align:right;color:#1a6b3c;background:#f0f7f2;font-size:14px">${fB(totPlanSL)}</td>
+    </tr>`;
+  } else {
+    tb='<tr><td colspan="9" style="text-align:center;color:#aaa;padding:30px">Không tìm thấy sản phẩm</td></tr>';
+  }
+  document.getElementById('planTbody').innerHTML=tb;
+}
+
+function renderPlanChart(){
+  // Gom theo nhóm hàng
+  const catMap={};
+  _planData.forEach(p=>{
+    if(!catMap[p.cat])catMap[p.cat]=0;
+    catMap[p.cat]+=p.planDT;
+  });
+  const labels=Object.keys(catMap).sort((a,b)=>catMap[b]-catMap[a]);
+  const vals=labels.map(c=>catMap[c]);
+  const palette=['#1a6b3c','#2b6cb0','#d69e2e','#c53030','#6b21a8','#2c7a7b','#c05621','#718096','#2d3748','#e53e3e'];
+  const colors=labels.map((_,i)=>palette[i%palette.length]);
+  const totalPlanDT=vals.reduce((s,v)=>s+v,0);
+  const fB=n=>new Intl.NumberFormat('vi-VN').format(Math.round(n));
+
+  const ctx=document.getElementById('planChart').getContext('2d');
+  if(_planChartInst) _planChartInst.destroy();
+  _planChartInst=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels,
+      datasets:[{
+        label:'DT dự kiến',
+        data:vals,
+        backgroundColor:colors,
+        borderRadius:6,
+        borderWidth:0
+      }]
+    },
+    options:{
+      responsive:true,
+      indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        datalabels:{
+          anchor:'end',align:'end',
+          formatter:v=>`${fB(v)} đ (${totalPlanDT>0?(v/totalPlanDT*100).toFixed(1):'0'}%)`,
+          font:{size:11,weight:'bold'},
+          color:'#333'
+        }
+      },
+      scales:{x:{ticks:{callback:v=>fB(v)},grid:{color:'#f0f0f0'}},y:{ticks:{font:{size:11}}}}
+    }
+  });
+}
+
+function exportPlanExcel(){
+  if(!_planData.length){alert('Chưa có dữ liệu kế hoạch.');return;}
+  if(typeof XLSX==='undefined'){alert('Thư viện Excel chưa tải xong, vui lòng thử lại.');return;}
+  const meta=_planData._meta||{};
+  const fV=n=>isNaN(n)?0:Math.round(n);
+  const wb=XLSX.utils.book_new();
+
+  // Sheet 1: Chi tiết
+  const header=['#','Sản phẩm','Nhóm hàng','DT TB/tháng (VNĐ)','Đơn giá TB (VNĐ)','SL TB/tháng','Tỷ trọng (%)','DT dự kiến (VNĐ)','SL kế hoạch'];
+  const wsData=[header];
+  let curCat='',n=0;
+  _planData.forEach(p=>{
+    if(p.cat!==curCat){curCat=p.cat;wsData.push([`📁 ${p.cat}`,'','','','','','','','']);}
+    n++;
+    wsData.push([n,p.ten,p.cat,fV(p.dtTB),fV(p.avgPrice),fV(p.slTB),parseFloat((p.share*100).toFixed(2)),fV(p.planDT),p.planSL]);
+  });
+  // Total
+  wsData.push(['','TỔNG CỘNG','',
+    fV(_planData.reduce((s,p)=>s+p.dtTB,0)),'',
+    fV(_planData.reduce((s,p)=>s+p.slTB,0)),'',
+    fV(_planData.reduce((s,p)=>s+p.planDT,0)),
+    _planData.reduce((s,p)=>s+p.planSL,0)
+  ]);
+
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  // Column widths
+  ws['!cols']=[{wch:5},{wch:45},{wch:25},{wch:20},{wch:18},{wch:15},{wch:12},{wch:20},{wch:15}];
+  XLSX.utils.book_append_sheet(wb,ws,'Chi tiết SP');
+
+  // Sheet 2: Tóm tắt theo nhóm
+  const catMap={};
+  _planData.forEach(p=>{
+    if(!catMap[p.cat])catMap[p.cat]={dtTB:0,slTB:0,planDT:0,planSL:0,count:0};
+    catMap[p.cat].dtTB+=p.dtTB;catMap[p.cat].slTB+=p.slTB;
+    catMap[p.cat].planDT+=p.planDT;catMap[p.cat].planSL+=p.planSL;catMap[p.cat].count++;
+  });
+  const ws2Data=[
+    [`Kế hoạch T${meta.targetMonth||''}/${meta.targetYear||''} – DT dự kiến: ${(meta.targetDT||0).toLocaleString('vi-VN')} đ`],
+    [],
+    ['Nhóm hàng','Số SP','DT TB/tháng','DT dự kiến','SL kế hoạch','Tỷ trọng (%)']
+  ];
+  const totalPlanDT2=Object.values(catMap).reduce((s,v)=>s+v.planDT,0);
+  Object.entries(catMap).sort((a,b)=>b[1].planDT-a[1].planDT).forEach(([cat,v])=>{
+    ws2Data.push([cat,v.count,fV(v.dtTB),fV(v.planDT),v.planSL,parseFloat((totalPlanDT2>0?v.planDT/totalPlanDT2*100:0).toFixed(2))]);
+  });
+  ws2Data.push(['TỔNG',_planData.length,fV(Object.values(catMap).reduce((s,v)=>s+v.dtTB,0)),fV(totalPlanDT2),Object.values(catMap).reduce((s,v)=>s+v.planSL,0),100]);
+  const ws2=XLSX.utils.aoa_to_sheet(ws2Data);
+  ws2['!cols']=[{wch:25},{wch:8},{wch:20},{wch:20},{wch:15},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Tóm tắt nhóm hàng');
+
+  const fname=`KH_SanLuong_T${meta.targetMonth||''}_${meta.targetYear||''}.xlsx`;
+  XLSX.writeFile(wb,fname);
 }
 
 // ===== KHỞI TẠO RENDER =====
