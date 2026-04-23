@@ -966,11 +966,20 @@ tr:last-child td{border-bottom:none}
         <option value="12">12 tháng gần nhất</option>
       </select>
     </div>
-    <div>
-      <div style="font-size:11px;font-weight:700;color:#1a6b3c;margin-bottom:5px">🔍 LỌC NHÓM HÀNG</div>
-      <select id="planCat" style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 10px;font-size:13px;outline:none;background:#fff">
-        <option value="">-- Tất cả nhóm hàng --</option>
-      </select>
+    <div style="position:relative">
+      <div style="font-size:11px;font-weight:700;color:#1a6b3c;margin-bottom:5px">🗂️ NHÓM HÀNG</div>
+      <div id="planCatBtn" onclick="togglePlanCatDrop()"
+        style="border:1px solid #b7dfc8;border-radius:6px;padding:6px 12px;font-size:12px;background:#fff;cursor:pointer;min-width:190px;display:flex;align-items:center;justify-content:space-between;gap:8px;user-select:none">
+        <span id="planCatLabel">✅ Tất cả nhóm hàng</span>
+        <span style="color:#aaa;font-size:10px">▼</span>
+      </div>
+      <div id="planCatDrop" style="display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:999;background:#fff;border:1px solid #b7dfc8;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.12);min-width:230px;max-height:280px;overflow-y:auto">
+        <div style="padding:8px 10px;border-bottom:1px solid #eee;display:flex;gap:8px">
+          <button onclick="planCatSelectAll(true)" style="flex:1;border:1px solid #b7dfc8;border-radius:4px;padding:3px 6px;font-size:11px;background:#e8f5ee;color:#1a6b3c;cursor:pointer;font-weight:700">✅ Chọn tất cả</button>
+          <button onclick="planCatSelectAll(false)" style="flex:1;border:1px solid #fecaca;border-radius:4px;padding:3px 6px;font-size:11px;background:#fff0f0;color:#c53030;cursor:pointer;font-weight:700">☐ Bỏ tất cả</button>
+        </div>
+        <div id="planCatList" style="padding:6px 4px"></div>
+      </div>
     </div>
     <button class="btn" style="padding:8px 20px;font-size:13px" onclick="computePlan()">🚀 Lập kế hoạch</button>
     <button id="planExportBtn" class="btn" style="padding:8px 20px;font-size:13px;background:#2b6cb0;display:none" onclick="exportPlanExcel()">⬇️ Tải Excel</button>
@@ -3635,6 +3644,37 @@ function renderBadDebt(){
 // ===== KẾ HOẠCH SẢN LƯỢNG =====
 let _planData=[], _planChartInst=null;
 
+// === Helpers checkbox nhóm hàng ===
+function togglePlanCatDrop(){
+  const d=document.getElementById('planCatDrop');
+  if(!d) return;
+  const open=d.style.display==='none';
+  d.style.display=open?'block':'none';
+  if(open){
+    // đóng khi click ngoài
+    setTimeout(()=>{
+      const close=e=>{if(!document.getElementById('planCatBtn')?.contains(e.target)&&!d.contains(e.target)){d.style.display='none';document.removeEventListener('click',close);}};
+      document.addEventListener('click',close);
+    },0);
+  }
+}
+function planCatSelectAll(val){
+  document.querySelectorAll('.plan-cat-cb').forEach(cb=>cb.checked=val);
+  updatePlanCatLabel();
+}
+function updatePlanCatLabel(){
+  const all=[...document.querySelectorAll('.plan-cat-cb')];
+  const checked=all.filter(cb=>cb.checked);
+  const lbl=document.getElementById('planCatLabel');
+  if(!lbl) return;
+  if(checked.length===0) lbl.textContent='☐ Không chọn nhóm nào';
+  else if(checked.length===all.length) lbl.textContent='✅ Tất cả nhóm hàng';
+  else lbl.textContent=`✅ ${checked.length} / ${all.length} nhóm`;
+}
+function getSelectedPlanCats(){
+  return [...document.querySelectorAll('.plan-cat-cb:checked')].map(cb=>cb.value);
+}
+
 function initPlanTab(){
   // Set default tháng = tháng hiện tại + 1
   const now=new Date();
@@ -3651,13 +3691,20 @@ function initPlanTab(){
       py.appendChild(o);
     });
   }
-  // Populate category filter from D_ALL
+  // Populate checkbox list from D_ALL
   const cats=[...new Set(D_ALL.map(r=>r.loaiHang).filter(Boolean))].sort();
-  const catSel=document.getElementById('planCat');
-  if(catSel){
-    catSel.innerHTML='<option value="">-- Tất cả nhóm hàng --</option>';
-    cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;catSel.appendChild(o);});
+  const list=document.getElementById('planCatList');
+  if(list){
+    const palette=['#1a6b3c','#2b6cb0','#d69e2e','#c53030','#6b21a8','#2c7a7b','#c05621','#2d3748'];
+    list.innerHTML=cats.map((c,i)=>{
+      const col=palette[i%palette.length];
+      return `<label style="display:flex;align-items:center;gap:8px;padding:5px 10px;cursor:pointer;border-radius:5px;transition:background .15s" onmouseover="this.style.background='#f0f7f2'" onmouseout="this.style.background=''">
+        <input type="checkbox" class="plan-cat-cb" value="${c}" checked onchange="updatePlanCatLabel()" style="width:15px;height:15px;accent-color:${col};cursor:pointer">
+        <span style="font-size:12px;color:#333">${c}</span>
+      </label>`;
+    }).join('');
   }
+  updatePlanCatLabel();
 }
 
 function computePlan(){
@@ -3666,10 +3713,14 @@ function computePlan(){
   const targetMonth=parseInt(document.getElementById('planMonth')?.value||new Date().getMonth()+2);
   const targetYear=parseInt(document.getElementById('planYear')?.value||new Date().getFullYear());
   const lookback=parseInt(document.getElementById('planLookback')?.value||6);
-  const catFilter=(document.getElementById('planCat')?.value||'').trim();
+  const selectedCats=getSelectedPlanCats();
 
   if(targetDT<=0){
     alert('Vui lòng nhập Doanh thu dự kiến (lớn hơn 0).');
+    return;
+  }
+  if(selectedCats.length===0){
+    alert('Vui lòng chọn ít nhất 1 nhóm hàng.');
     return;
   }
   if(!D_ALL.length){
@@ -3685,10 +3736,14 @@ function computePlan(){
     refMonths.push({m,y});
   }
 
+  // Kiểm tra có đủ data cho tất cả cats không
+  const allCats=[...new Set(D_ALL.map(r=>r.loaiHang).filter(Boolean))];
+  const validCats=selectedCats.filter(c=>allCats.includes(c));
+
   // Lọc dữ liệu lịch sử
   const hist=D_ALL.filter(r=>{
     if(!r.sanPham||!r.thang||!r.nam) return false;
-    if(catFilter&&r.loaiHang!==catFilter) return false;
+    if(!validCats.includes(r.loaiHang)) return false;
     return refMonths.some(p=>r.nam===p.y&&r.thang===p.m);
   });
 
@@ -3725,7 +3780,7 @@ function computePlan(){
     .sort((a,b)=>b.planDT-a.planDT);
 
   // Lưu meta
-  _planData._meta={targetDT,targetMonth,targetYear,lookback,catFilter,refMonths};
+  _planData._meta={targetDT,targetMonth,targetYear,lookback,selectedCats,refMonths};
   renderPlanSummary();
   renderPlanTable();
   renderPlanChart();
@@ -3742,11 +3797,13 @@ function renderPlanSummary(){
   const totalPlanSL=_planData.reduce((s,p)=>s+p.planSL,0);
   const cats=[...new Set(_planData.map(p=>p.cat))];
   const mn=meta.targetMonth?`T${meta.targetMonth}/${meta.targetYear}`:'';
+  const selCatsAll=[...document.querySelectorAll('.plan-cat-cb')];
+  const catChip=cats.length===selCatsAll.length?'Tất cả nhóm hàng':`${cats.length} nhóm hàng`;
   document.getElementById('planSummary').innerHTML=
     chip(`💰 DT dự kiến ${mn}: ${fB(meta.targetDT||0)}`,'#fff8e6','#7a5800')+' '+
     chip(`📦 SL kế hoạch: ${fB(totalPlanSL)} SP`,'#e8f5ee','#1a6b3c')+' '+
     chip(`🏷️ ${_planData.length} sản phẩm`,'#ebf8ff','#2b6cb0')+' '+
-    chip(`🗂️ ${cats.length} nhóm hàng`,'#f3e8ff','#6b21a8')+' '+
+    chip(`🗂️ ${catChip}`,'#f3e8ff','#6b21a8')+' '+
     chip(`📅 Phân tích ${meta.lookback||6} tháng gần nhất`,'#f8fafc','#555');
   document.getElementById('planSubtitle').textContent=
     `Dựa trên dữ liệu ${meta.lookback||6} tháng • ${_planData.length} sản phẩm • DT dự kiến: ${fB(meta.targetDT||0)} đ`;
@@ -3755,11 +3812,9 @@ function renderPlanSummary(){
 function renderPlanTable(){
   const fB=n=>(!n||isNaN(n))?'–':new Intl.NumberFormat('vi-VN').format(Math.round(n));
   const search=(document.getElementById('planSearch')?.value||'').toLowerCase().trim();
-  const catFilter=(document.getElementById('planCat')?.value||'').trim();
 
   let rows=_planData.filter(p=>{
     if(search&&!(p.ten.toLowerCase().includes(search)||p.cat.toLowerCase().includes(search))) return false;
-    if(catFilter&&p.cat!==catFilter) return false;
     return true;
   });
 
