@@ -247,11 +247,10 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('bod',this)">📋 Báo cáo Chuỗi</div>
   <div class="tab" onclick="showTab('order',this)">🚚 Theo dõi Đơn</div>
   <div class="tab-sep"></div>
-  <div class="tab" onclick="showTab('cmp',this)">So sánh tháng</div>
+  <div class="tab" onclick="showTab('compare',this)">📈 So sánh</div>
   <div class="tab" onclick="showTab('st',this)">Cửa hàng</div>
   <div class="tab" onclick="showTab('pd',this)">Sản phẩm</div>
   <div class="tab" onclick="showTab('miss',this)">📦 SP NVL</div>
-  <div class="tab" onclick="showTab('yoy',this)">📈 So sánh YoY</div>
   <div class="tab" onclick="showTab('kpi',this)">🎯 KPI Mục tiêu</div>
   <div class="tab" onclick="showTab('noxau',this)">💸 Nợ xấu</div>
   <div class="tab" onclick="showTab('plan',this)">📊 Kế hoạch SL</div>
@@ -316,41 +315,134 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<!-- SO SÁNH THÁNG -->
-<div class="page" id="page-cmp">
-  <p class="stitle">So sánh theo Tháng</p>
-  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:11px;font-weight:700;color:#3182ce">● Kỳ 1</span>
-      <div style="display:flex;gap:4px">
-        <select id="cmpM1" class="filter-sel" style="width:64px"></select>
-        <select id="cmpY1" class="filter-sel" style="width:72px"></select>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:11px;font-weight:700;color:#38a169">● Kỳ 2</span>
-      <div style="display:flex;gap:4px">
-        <select id="cmpM2" class="filter-sel" style="width:64px"></select>
-        <select id="cmpY2" class="filter-sel" style="width:72px"></select>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:11px;font-weight:700;color:#f0a500">● Kỳ 3 (tùy chọn)</span>
-      <div style="display:flex;gap:4px">
-        <select id="cmpM3" class="filter-sel" style="width:64px"></select>
-        <select id="cmpY3" class="filter-sel" style="width:72px"></select>
-      </div>
-    </div>
-    <button class="save-btn" onclick="renderCmpPage()" style="height:32px;align-self:flex-end">🔍 So sánh</button>
+<!-- SO SÁNH (THÁNG + NĂM) -->
+<div class="page" id="page-compare">
+  <!-- Sub-tabs -->
+  <div style="display:flex;gap:4px;border-bottom:2px solid #e2e8f0;margin-bottom:20px">
+    <button id="cmptab-cmp" onclick="switchCmpSubTab('cmp')" style="background:#3182ce;color:#fff;border:2px solid #3182ce;border-bottom:2px solid #fff;border-radius:8px 8px 0 0;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:-2px">📅 So sánh tháng</button>
+    <button id="cmptab-yoy" onclick="switchCmpSubTab('yoy')" style="background:#f8fafc;color:#6b7a8d;border:2px solid #e2e8f0;border-bottom:2px solid #e2e8f0;border-radius:8px 8px 0 0;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:-2px">📈 So sánh năm</button>
   </div>
-  <div class="cgrid" id="cmpCards"></div>
-  <div class="cc" style="margin-bottom:16px">
-    <div class="ch"><div class="ctitle" id="cmpChTitle">Biểu đồ so sánh</div></div>
-    <div style="position:relative;height:300px"><canvas id="cCmpDetail"></canvas></div>
+
+  <!-- == SO SÁNH THÁNG == -->
+  <div id="cmpsub-cmp">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:11px;font-weight:700;color:#3182ce">● Kỳ 1</span>
+        <div style="display:flex;gap:4px">
+          <select id="cmpM1" class="filter-sel" style="width:64px"></select>
+          <select id="cmpY1" class="filter-sel" style="width:72px"></select>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:11px;font-weight:700;color:#38a169">● Kỳ 2</span>
+        <div style="display:flex;gap:4px">
+          <select id="cmpM2" class="filter-sel" style="width:64px"></select>
+          <select id="cmpY2" class="filter-sel" style="width:72px"></select>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:11px;font-weight:700;color:#f0a500">● Kỳ 3 (tùy chọn)</span>
+        <div style="display:flex;gap:4px">
+          <select id="cmpM3" class="filter-sel" style="width:64px"></select>
+          <select id="cmpY3" class="filter-sel" style="width:72px"></select>
+        </div>
+      </div>
+      <button class="save-btn" onclick="renderCmpPage()" style="height:32px;align-self:flex-end">🔍 So sánh</button>
+    </div>
+    <div class="cgrid" id="cmpCards"></div>
+    <div class="cc" style="margin-bottom:16px">
+      <div class="ch"><div class="ctitle" id="cmpChTitle">Biểu đồ so sánh</div></div>
+      <div style="position:relative;height:300px"><canvas id="cCmpDetail"></canvas></div>
+    </div>
+    <div class="cc">
+      <div class="ch"><div><div class="ctitle">% Thay đổi so với kỳ trước</div><div class="csub">Tính theo kỳ liên tiếp đã chọn</div></div></div>
+      <div style="position:relative;height:230px"><canvas id="cMoM"></canvas></div>
+    </div>
   </div>
-  <div class="cc">
-    <div class="ch"><div><div class="ctitle">% Thay đổi so với kỳ trước</div><div class="csub">Tính theo kỳ liên tiếp đã chọn</div></div></div>
-    <div style="position:relative;height:230px"><canvas id="cMoM"></canvas></div>
+
+  <!-- == SO SÁNH NĂM == -->
+  <div id="cmpsub-yoy" style="display:none">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:11px;font-weight:700;color:#3182ce">● Kỳ A</span>
+        <div style="display:flex;gap:4px">
+          <select id="yYearA" class="filter-sel" onchange="renderYoY()" style="width:72px"></select>
+          <select id="yTypeA" class="filter-sel" onchange="updateYoYPicker('A');renderYoY()" style="width:80px">
+            <option value="month">Tháng</option>
+            <option value="quarter" selected>Quý</option>
+            <option value="year">Cả năm</option>
+          </select>
+          <select id="yValA" class="filter-sel" onchange="renderYoY()" style="width:70px"></select>
+        </div>
+      </div>
+      <span style="font-weight:700;color:#6b7a8d;align-self:flex-end;padding-bottom:4px">vs</span>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:11px;font-weight:700;color:#38a169">● Kỳ B</span>
+        <div style="display:flex;gap:4px">
+          <select id="yYearB" class="filter-sel" onchange="renderYoY()" style="width:72px"></select>
+          <select id="yTypeB" class="filter-sel" onchange="updateYoYPicker('B');renderYoY()" style="width:80px">
+            <option value="month">Tháng</option>
+            <option value="quarter" selected>Quý</option>
+            <option value="year">Cả năm</option>
+          </select>
+          <select id="yValB" class="filter-sel" onchange="renderYoY()" style="width:70px"></select>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:11px;font-weight:700;color:#555">Cửa hàng</span>
+        <select id="yStore" class="filter-sel" onchange="renderYoY()"><option value="">Tất cả</option></select>
+      </div>
+    </div>
+    <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px" id="yoyKPIGrid">
+      <div class="kc go"><div class="klbl" id="yk_lbl_dtA">Kỳ A – DT</div><div class="kval" id="yk_dt26">–</div><div class="ksub" id="yk_dt_d">–</div></div>
+      <div class="kc go"><div class="klbl" id="yk_lbl_dtB">Kỳ B – DT</div><div class="kval" id="yk_dt25">–</div><div class="ksub" id="yk_dt_pct">–</div></div>
+      <div class="kc gr"><div class="klbl" id="yk_lbl_lnA">Kỳ A – LN</div><div class="kval" id="yk_ln26">–</div><div class="ksub" id="yk_ln_d">–</div></div>
+      <div class="kc gr"><div class="klbl" id="yk_lbl_lnB">Kỳ B – LN</div><div class="kval" id="yk_ln25">–</div><div class="ksub" id="yk_ln_pct">–</div></div>
+      <div class="kc bl"><div class="klbl" id="yk_lbl_slA">Kỳ A – SL</div><div class="kval" id="yk_sl26">–</div><div class="ksub" id="yk_sl_d">–</div></div>
+      <div class="kc bl"><div class="klbl" id="yk_lbl_slB">Kỳ B – SL</div><div class="kval" id="yk_sl25">–</div><div class="ksub" id="yk_sl_pct">–</div></div>
+      <div class="kc rd"><div class="klbl" id="yk_lbl_tsA">Kỳ A – TSLN</div><div class="kval" id="yk_tsln26">–</div><div class="ksub" id="yk_tsln_d">–</div></div>
+      <div class="kc rd"><div class="klbl" id="yk_lbl_tsB">Kỳ B – TSLN</div><div class="kval" id="yk_tsln25">–</div><div class="ksub" id="yk_tsln_pct">–</div></div>
+    </div>
+    <div class="row22" style="margin-bottom:16px">
+      <div class="cc">
+        <div class="ch"><div><div class="ctitle" id="yoyChTitle1">So sánh Doanh thu</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
+        <div style="position:relative;height:280px"><canvas id="cYoyDT"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="ch"><div><div class="ctitle" id="yoyChTitle2">So sánh Lợi nhuận</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
+        <div style="position:relative;height:280px"><canvas id="cYoyLN"></canvas></div>
+      </div>
+    </div>
+    <div class="row22" style="margin-bottom:16px">
+      <div class="cc">
+        <div class="ch"><div><div class="ctitle" id="yoyChTitle3">% Tăng trưởng DT</div><div class="csub">% thay đổi từng tháng so với cùng kỳ 2025</div></div></div>
+        <div style="position:relative;height:240px"><canvas id="cYoyGrowth"></canvas></div>
+      </div>
+      <div class="cc">
+        <div class="ch"><div><div class="ctitle" id="yoyChTitle4">So sánh Số lượng</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
+        <div style="position:relative;height:240px"><canvas id="cYoySL"></canvas></div>
+      </div>
+    </div>
+    <div class="cc" style="margin-bottom:16px">
+      <div class="ch"><div><div class="ctitle" id="yoyChTitle5">Chi tiết so sánh</div><div class="csub">Doanh thu, Lợi nhuận, Số lượng – 2025 vs 2026</div></div></div>
+      <div class="tbl-wrap">
+        <table id="yoyDetailTable">
+          <thead>
+            <tr>
+              <th>Kỳ</th>
+              <th>DT 2025</th><th>DT 2026</th><th>Tăng trưởng DT</th>
+              <th>LN 2025</th><th>LN 2026</th><th>Tăng trưởng LN</th>
+              <th>SL 2025</th><th>SL 2026</th><th>Tăng trưởng SL</th>
+            </tr>
+          </thead>
+          <tbody id="yoyTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="cc">
+      <div class="ch"><div><div class="ctitle" id="yoyStoreTitle">Top 15 Cửa hàng – So sánh 2025 vs 2026</div><div class="csub">Doanh thu theo từng cửa hàng</div></div></div>
+      <div style="position:relative;height:420px"><canvas id="cYoyStore"></canvas></div>
+    </div>
   </div>
 </div>
 
@@ -691,101 +783,6 @@ tr:last-child td{border-bottom:none}
   <div id="weekReport"><div style="color:#aaa;padding:24px">Chọn khoảng thời gian để xem báo cáo.</div></div>
 </div>
 
-<!-- SO SÁNH YOY -->
-<div class="page" id="page-yoy">
-  <p class="stitle">📈 So sánh theo Kỳ</p>
-
-  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;padding:12px 16px;background:#f8fafc;border-radius:8px;border:1px solid #e2e8f0">
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:11px;font-weight:700;color:#3182ce">● Kỳ A</span>
-      <div style="display:flex;gap:4px">
-        <select id="yYearA" class="filter-sel" onchange="renderYoY()" style="width:72px"></select>
-        <select id="yTypeA" class="filter-sel" onchange="updateYoYPicker('A');renderYoY()" style="width:80px">
-          <option value="month">Tháng</option>
-          <option value="quarter" selected>Quý</option>
-          <option value="year">Cả năm</option>
-        </select>
-        <select id="yValA" class="filter-sel" onchange="renderYoY()" style="width:70px"></select>
-      </div>
-    </div>
-    <span style="font-weight:700;color:#6b7a8d;align-self:flex-end;padding-bottom:4px">vs</span>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:11px;font-weight:700;color:#38a169">● Kỳ B</span>
-      <div style="display:flex;gap:4px">
-        <select id="yYearB" class="filter-sel" onchange="renderYoY()" style="width:72px"></select>
-        <select id="yTypeB" class="filter-sel" onchange="updateYoYPicker('B');renderYoY()" style="width:80px">
-          <option value="month">Tháng</option>
-          <option value="quarter" selected>Quý</option>
-          <option value="year">Cả năm</option>
-        </select>
-        <select id="yValB" class="filter-sel" onchange="renderYoY()" style="width:70px"></select>
-      </div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <span style="font-size:11px;font-weight:700;color:#555">Cửa hàng</span>
-      <select id="yStore" class="filter-sel" onchange="renderYoY()"><option value="">Tất cả</option></select>
-    </div>
-  </div>
-
-  <!-- KPI so sánh -->
-  <div class="kgrid" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px" id="yoyKPIGrid">
-    <div class="kc go"><div class="klbl" id="yk_lbl_dtA">Kỳ A – DT</div><div class="kval" id="yk_dt26">–</div><div class="ksub" id="yk_dt_d">–</div></div>
-    <div class="kc go"><div class="klbl" id="yk_lbl_dtB">Kỳ B – DT</div><div class="kval" id="yk_dt25">–</div><div class="ksub" id="yk_dt_pct">–</div></div>
-    <div class="kc gr"><div class="klbl" id="yk_lbl_lnA">Kỳ A – LN</div><div class="kval" id="yk_ln26">–</div><div class="ksub" id="yk_ln_d">–</div></div>
-    <div class="kc gr"><div class="klbl" id="yk_lbl_lnB">Kỳ B – LN</div><div class="kval" id="yk_ln25">–</div><div class="ksub" id="yk_ln_pct">–</div></div>
-    <div class="kc bl"><div class="klbl" id="yk_lbl_slA">Kỳ A – SL</div><div class="kval" id="yk_sl26">–</div><div class="ksub" id="yk_sl_d">–</div></div>
-    <div class="kc bl"><div class="klbl" id="yk_lbl_slB">Kỳ B – SL</div><div class="kval" id="yk_sl25">–</div><div class="ksub" id="yk_sl_pct">–</div></div>
-    <div class="kc rd"><div class="klbl" id="yk_lbl_tsA">Kỳ A – TSLN</div><div class="kval" id="yk_tsln26">–</div><div class="ksub" id="yk_tsln_d">–</div></div>
-    <div class="kc rd"><div class="klbl" id="yk_lbl_tsB">Kỳ B – TSLN</div><div class="kval" id="yk_tsln25">–</div><div class="ksub" id="yk_tsln_pct">–</div></div>
-  </div>
-
-  <!-- Biểu đồ -->
-  <div class="row22" style="margin-bottom:16px">
-    <div class="cc">
-      <div class="ch"><div><div class="ctitle" id="yoyChTitle1">So sánh Doanh thu</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
-      <div style="position:relative;height:280px"><canvas id="cYoyDT"></canvas></div>
-    </div>
-    <div class="cc">
-      <div class="ch"><div><div class="ctitle" id="yoyChTitle2">So sánh Lợi nhuận</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
-      <div style="position:relative;height:280px"><canvas id="cYoyLN"></canvas></div>
-    </div>
-  </div>
-
-  <div class="row22" style="margin-bottom:16px">
-    <div class="cc">
-      <div class="ch"><div><div class="ctitle" id="yoyChTitle3">% Tăng trưởng DT</div><div class="csub">% thay đổi từng tháng so với cùng kỳ 2025</div></div></div>
-      <div style="position:relative;height:240px"><canvas id="cYoyGrowth"></canvas></div>
-    </div>
-    <div class="cc">
-      <div class="ch"><div><div class="ctitle" id="yoyChTitle4">So sánh Số lượng</div><div class="csub">So sánh cùng kỳ từng tháng</div></div></div>
-      <div style="position:relative;height:240px"><canvas id="cYoySL"></canvas></div>
-    </div>
-  </div>
-
-  <!-- Bảng chi tiết theo tháng -->
-  <div class="cc" style="margin-bottom:16px">
-    <div class="ch"><div><div class="ctitle" id="yoyChTitle5">Chi tiết so sánh</div><div class="csub">Doanh thu, Lợi nhuận, Số lượng – 2025 vs 2026</div></div></div>
-    <div class="tbl-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Kỳ</th>
-            <th>DT 2025</th><th>DT 2026</th><th>Tăng trưởng DT</th>
-            <th>LN 2025</th><th>LN 2026</th><th>Tăng trưởng LN</th>
-            <th>SL 2025</th><th>SL 2026</th><th>Tăng trưởng SL</th>
-          </tr>
-        </thead>
-        <tbody id="yoyTbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Top cửa hàng so sánh -->
-  <div class="cc">
-    <div class="ch"><div><div class="ctitle" id="yoyStoreTitle">Top 15 Cửa hàng – So sánh 2025 vs 2026</div><div class="csub">Doanh thu theo từng cửa hàng</div></div></div>
-    <div style="position:relative;height:420px"><canvas id="cYoyStore"></canvas></div>
-  </div>
-</div>
 
 <!-- KPI MỤC TIÊU -->
 <div class="page" id="page-kpi">
@@ -1171,7 +1168,7 @@ function renderAll(){
   const active=document.querySelector('.page.on');
   if(active){
     const id=active.id;
-    if(id==='page-cmp')renderCmpPage();
+    if(id==='page-compare')switchCmpSubTab(_activeCmpSub||'cmp');
     else if(id==='page-st')renderStPage();
     else if(id==='page-pd')renderPdPage();
   }
@@ -2292,7 +2289,7 @@ function renderYoY(){
   document.getElementById('yoyTbody').innerHTML=tb;
 
   // Update table header to show A/B labels
-  const thead=document.querySelector('#page-yoy table thead tr');
+  const thead=document.querySelector('#yoyDetailTable thead tr');
   if(thead) thead.innerHTML=`<th>Kỳ</th><th>${lblB} DT</th><th>${lblA} DT</th><th>Tăng trưởng DT</th><th>${lblB} LN</th><th>${lblA} LN</th><th>Tăng trưởng LN</th><th>${lblB} SL</th><th>${lblA} SL</th><th>Tăng trưởng SL</th>`;
 
   // Top stores
@@ -3194,13 +3191,12 @@ function showTab(name,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
   document.getElementById('page-'+name).classList.add('on');
   el.classList.add('on');
-  if(name==='cmp')renderCmpPage();
+  if(name==='compare'){switchCmpSubTab(_activeCmpSub||'cmp');}
   if(name==='st')renderStPage();
   if(name==='pd')renderPdPage();
   if(name==='miss')renderMissPage();
   if(name==='week'){setWeek7d();}
   if(name==='order')renderOrderTrack();
-  if(name==='yoy')renderYoY();
   if(name==='kpi'){loadKPI();fetchKPIFromSheet().then(()=>recalcKPI());}
   if(name==='bod'){loadKPI();renderBOD();}
   if(name==='noxau'){
@@ -3219,6 +3215,26 @@ function showTab(name,el){
     renderSavedPlanList();
   }
   if(name==='inv') initInvTab();
+}
+
+var _activeCmpSub='cmp';
+function switchCmpSubTab(name){
+  _activeCmpSub=name;
+  // Show/hide sub-sections
+  const cmpDiv=document.getElementById('cmpsub-cmp');
+  const yoyDiv=document.getElementById('cmpsub-yoy');
+  if(cmpDiv) cmpDiv.style.display=name==='cmp'?'':'none';
+  if(yoyDiv) yoyDiv.style.display=name==='yoy'?'':'none';
+  // Update button styles
+  const btnCmp=document.getElementById('cmptab-cmp');
+  const btnYoy=document.getElementById('cmptab-yoy');
+  const activeStyle='background:#3182ce;color:#fff;border:2px solid #3182ce;border-bottom:2px solid #fff;border-radius:8px 8px 0 0;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:-2px';
+  const inactiveStyle='background:#f8fafc;color:#6b7a8d;border:2px solid #e2e8f0;border-bottom:2px solid #e2e8f0;border-radius:8px 8px 0 0;padding:8px 22px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:-2px';
+  if(btnCmp) btnCmp.style.cssText=name==='cmp'?activeStyle:inactiveStyle;
+  if(btnYoy) btnYoy.style.cssText=name==='yoy'?activeStyle:inactiveStyle;
+  // Render content
+  if(name==='cmp') renderCmpPage();
+  if(name==='yoy') renderYoY();
 }
 
 
