@@ -965,6 +965,8 @@ tr:last-child td{border-bottom:none}
     </div>
     <button class="btn" style="padding:6px 14px;font-size:12px" onclick="invCopyPrevMonth()">📋 Sao chép tháng trước</button>
     <button class="btn" style="padding:6px 14px;font-size:12px;background:#2b6cb0" onclick="exportInvExcel()">⬇️ Excel</button>
+    <button class="btn" style="padding:6px 14px;font-size:12px;background:#38a169" onclick="invSaveMonth()">💾 Lưu tháng</button>
+    <button class="btn" style="padding:6px 14px;font-size:12px;background:#805ad5" onclick="invAddProduct()">➕ Thêm SP</button>
   </div>
 
   <!-- KPI chips -->
@@ -985,12 +987,13 @@ tr:last-child td{border-bottom:none}
           <th style="text-align:right;width:90px;background:#fffbea;color:#7a5800;font-weight:700">Tồn cuối kỳ</th>
           <th style="text-align:right;width:80px">Tồn tối thiểu</th>
           <th style="text-align:center;width:110px">Trạng thái</th>
+          <th style="text-align:center;width:36px"></th>
         </tr></thead>
         <tbody id="invTbody"></tbody>
       </table>
     </div>
   </div>
-  <div style="font-size:11px;color:#aaa;margin-top:8px">💡 Nhấn vào ô <b>Tồn đầu</b>, <b>Nhập kho</b>, <b>Tồn tối thiểu</b> để chỉnh sửa. Xuất kho tự động lấy từ dữ liệu bán hàng.</div>
+  <div style="font-size:11px;color:#aaa;margin-top:8px">💡 Nhấn vào ô <b>Tồn đầu</b>, <b>Nhập kho</b>, <b>Tồn tối thiểu</b> để chỉnh sửa. Xuất kho tự động lấy từ dữ liệu bán hàng. Tồn cuối kỳ tự động làm Tồn đầu tháng sau.</div>
 </div>
 
 <!-- ===== PAGE KẾ HOẠCH SẢN LƯỢNG ===== -->
@@ -3864,24 +3867,28 @@ function computePlan(){
   hist.forEach(r=>{
     const rawName=r.sanPham||'(Không xác định)';
     const normalized=smartMerge?normalizeSPName(rawName):rawName;
-    // Dùng lowercase làm key để gộp tên in hoa/thường khác nhau
-    const k=smartMerge?normalized.toLowerCase():rawName;
+    // Luôn dùng lowercase để gộp tên in hoa/thường; nếu smartMerge thì còn normalize thêm
+    const k=normalized.toLowerCase();
+    const thisDate=(r.nam||0)*100+(r.thang||0);
     if(!prodMap[k]){
       prodMap[k]={
-        displayName:normalized,  // giữ tên hiển thị từ lần đầu gặp
+        displayName:rawName,  // tên đầy đủ gốc
+        lastDate:thisDate,
         cat:r.loaiHang||'Khác',
         dt:0,sl:0,
         monthSet:new Set(),
         variants:new Set()
       };
     }
-    // Ưu tiên tên ngắn hơn (thường là tên gốc không có hậu tố)
-    if(normalized.length<prodMap[k].displayName.length) prodMap[k].displayName=normalized;
+    // Dùng tên từ tháng mới nhất (tên sản phẩm cập nhật nhất)
+    if(thisDate>=prodMap[k].lastDate){
+      prodMap[k].displayName=rawName;
+      prodMap[k].lastDate=thisDate;
+    }
     prodMap[k].dt+=(r.thanhTien||0);
     prodMap[k].sl+=(r.sl||0);
     prodMap[k].monthSet.add(`${r.nam}-${r.thang}`);
-    // Ghi nhận biến thể: khác key (tức là đã normalize/lowercase khác tên gốc)
-    if(rawName!==prodMap[k].displayName) prodMap[k].variants.add(rawName);
+    prodMap[k].variants.add(rawName);
   });
 
   const totalDT=Object.values(prodMap).reduce((s,p)=>s+p.dt,0);
@@ -4339,14 +4346,16 @@ const INV_PRODUCTS=[
 ];
 
 const INV_KEY='phuctea_inv_data';
+const INV_CUSTOM_KEY='phuctea_inv_custom';
+const INV_HIDDEN_KEY='phuctea_inv_hidden';
 
 function invKey(m,y){return `${y}-${String(m).padStart(2,'0')}`;}
 
-function loadInvData(m,y){
+function loadInvData(){
   try{return JSON.parse(localStorage.getItem(INV_KEY)||'{}');}catch{return{};}
 }
 function saveInvCell(m,y,ten,field,val){
-  const all=loadInvData(m,y);
+  const all=loadInvData();
   const k=invKey(m,y);
   if(!all[k])all[k]={};
   if(!all[k][ten])all[k][ten]={};
@@ -4355,6 +4364,39 @@ function saveInvCell(m,y,ten,field,val){
 }
 function getInvCell(all,m,y,ten,field){
   return all?.[invKey(m,y)]?.[ten]?.[field]??null;
+}
+
+// Sản phẩm tùy chỉnh (thêm mới)
+function getCustomProducts(){
+  try{return JSON.parse(localStorage.getItem(INV_CUSTOM_KEY)||'[]');}catch{return[];}
+}
+// Sản phẩm đã ẩn (xóa khỏi danh sách gốc)
+function getHiddenProducts(){
+  try{return JSON.parse(localStorage.getItem(INV_HIDDEN_KEY)||'[]');}catch{return[];}
+}
+// Danh sách sản phẩm hiệu quả (gốc - ẩn + tùy chỉnh)
+function getEffectiveProducts(){
+  const hidden=new Set(getHiddenProducts());
+  return [
+    ...INV_PRODUCTS.filter(p=>!hidden.has(p.ten)),
+    ...getCustomProducts().map(p=>({...p,isCustom:true}))
+  ];
+}
+
+// Tồn đầu: ưu tiên nhập tay; nếu chưa có thì tự động lấy tồn cuối tháng trước
+function getAutoTonDau(all,m,y,ten){
+  const saved=getInvCell(all,m,y,ten,'tonDau');
+  if(saved!==null) return {val:saved,auto:false};
+  let pm=m-1,py=y;
+  if(pm<=0){pm=12;py--;}
+  const prevKey=invKey(pm,py);
+  if(!all[prevKey]||!all[prevKey][ten]) return {val:null,auto:false};
+  const prevTonDau=all[prevKey][ten].tonDau??0;
+  const prevNhap=all[prevKey][ten].nhap??0;
+  const prevXuatOv=all[prevKey][ten].xuat??null;
+  const prevXuat=prevXuatOv!==null?prevXuatOv:getXuatKho(ten,pm,py);
+  const prevTonCuoi=prevTonDau+prevNhap-prevXuat;
+  return {val:prevTonCuoi,auto:true};
 }
 
 // Lấy xuất kho từ dữ liệu bán hàng (tổng SL bán trong tháng)
@@ -4376,7 +4418,7 @@ function initInvTab(){
   if(mEl) mEl.value=now.getMonth()+1;
   if(yEl) yEl.value=now.getFullYear();
   // Populate category filter
-  const cats=[...new Set(INV_PRODUCTS.map(p=>p.cat))].sort();
+  const cats=[...new Set(getEffectiveProducts().map(p=>p.cat))].sort();
   const catEl=document.getElementById('invCat');
   if(catEl){
     catEl.innerHTML='<option value="">Tất cả</option>';
@@ -4392,10 +4434,10 @@ function renderInvTable(){
   const search=(document.getElementById('invSearch')?.value||'').toLowerCase().trim();
   const mode=document.getElementById('invShowMode')?.value||'all';
 
-  const all=loadInvData(m,y);
-  const fN=n=>n===null||n===undefined?'':Number(n).toLocaleString('vi-VN');
+  const all=loadInvData();
+  const prods=getEffectiveProducts();
 
-  let rows=INV_PRODUCTS.filter(p=>{
+  let rows=prods.filter(p=>{
     if(cat&&p.cat!==cat)return false;
     if(search&&!p.ten.toLowerCase().includes(search)&&!p.cat.toLowerCase().includes(search))return false;
     return true;
@@ -4403,7 +4445,9 @@ function renderInvTable(){
 
   // Tính data cho từng sản phẩm
   const computed=rows.map(p=>{
-    const tonDau=getInvCell(all,m,y,p.ten,'tonDau')??0;
+    const tonDauObj=getAutoTonDau(all,m,y,p.ten);
+    const tonDau=tonDauObj.val??0;
+    const tonDauAuto=tonDauObj.auto;
     const nhap=getInvCell(all,m,y,p.ten,'nhap')??0;
     const xuatOverride=getInvCell(all,m,y,p.ten,'xuat');
     const xuat=xuatOverride!==null?xuatOverride:getXuatKho(p.ten,m,y);
@@ -4415,7 +4459,7 @@ function renderInvTable(){
     else if(tonCuoi<=0){status='🔴 Hết hàng';sbg='#fff0f0';scl='#c53030';}
     else if(tonMin>0&&tonCuoi<=tonMin){status='⚠️ Sắp hết';sbg='#fffbea';scl='#7a5800';}
     else{status='✅ Đủ hàng';sbg='#e8f5ee';scl='#1a6b3c';}
-    return{...p,tonDau,nhap,xuat,tonMin,tonCuoi,hasData,status,sbg,scl,xuatAuto:xuatOverride===null};
+    return{...p,tonDau,tonDauAuto,nhap,xuat,tonMin,tonCuoi,hasData,status,sbg,scl,xuatAuto:xuatOverride===null};
   });
 
   // Filter theo mode
@@ -4441,31 +4485,50 @@ function renderInvTable(){
   let tb='',curCat='',n=0;
 
   if(!filtered.length){
-    tb='<tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">Không có sản phẩm nào</td></tr>';
+    tb='<tr><td colspan="11" style="text-align:center;color:#aaa;padding:30px">Không có sản phẩm nào</td></tr>';
   } else {
     filtered.forEach(p=>{
       if(p.cat!==curCat){
         curCat=p.cat;
         const cl=catColors[p.cat]||'#555';
-        tb+=`<tr style="background:#f0f7f2"><td colspan="10" style="padding:5px 12px;font-weight:700;font-size:11px;color:${cl};letter-spacing:.4px">📁 ${p.cat}</td></tr>`;
+        tb+=`<tr style="background:#f0f7f2"><td colspan="11" style="padding:5px 12px;font-weight:700;font-size:11px;color:${cl};letter-spacing:.4px">📁 ${p.cat}</td></tr>`;
       }
       n++;
-      const tonCuoiCol=p.tonCuoi<0?'color:#c53030':p.tonCuoi===0&&p.hasData?'color:#c53030':'color:#d69e2e;font-weight:700';
-      const inputStyle='width:70px;text-align:right;border:1px solid #ddd;border-radius:4px;padding:3px 5px;font-size:11px;outline:none';
+      const tonCuoiStyle=p.tonCuoi<0||p.tonCuoi===0&&p.hasData?'color:#c53030':'color:#d69e2e;font-weight:700';
+      const iStyle='width:70px;text-align:right;border:1px solid #ddd;border-radius:4px;padding:3px 5px;font-size:11px;outline:none';
+      const tenSafe=p.ten.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      const isCustom=p.isCustom?'true':'false';
+      // Tồn đầu: nếu auto thì hiển thị giá trị + badge
+      const tonDauVal=p.tonDau||'';
+      const tonDauPH=p.tonDauAuto?p.tonDau:'0';
+      const tonDauBg=p.tonDauAuto?'#fff9e6':'#f0f9ff';
+      const tonDauTitle=p.tonDauAuto?`title="Tự động từ tồn cuối T${m===1?12:m-1}/${m===1?y-1:y}"`:'';
       tb+=`<tr>
         <td style="text-align:center;color:#aaa;font-size:11px">${n}</td>
-        <td style="font-weight:600;font-size:12px">${p.ten}</td>
+        <td style="font-weight:600;font-size:12px">${p.ten}${p.isCustom?'<span style="font-size:9px;background:#e9d8fd;color:#6b21a8;padding:1px 5px;border-radius:4px;margin-left:5px">tùy chỉnh</span>':''}</td>
         <td><span style="font-size:10px;color:${catColors[p.cat]||'#555'};font-weight:600">${p.cat}</span></td>
         <td style="text-align:center;color:#888;font-size:11px">${p.dvt}</td>
-        <td style="background:#f0f9ff;text-align:right"><input type="number" min="0" value="${p.tonDau||''}" placeholder="0" style="${inputStyle};background:#f0f9ff" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','tonDau',+this.value)" onfocus="this.select()"></td>
-        <td style="background:#f0fdf4;text-align:right"><input type="number" min="0" value="${p.nhap||''}" placeholder="0" style="${inputStyle};background:#f0fdf4" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','nhap',+this.value)" onfocus="this.select()"></td>
-        <td style="background:#fff5f5;text-align:right">
-          <input type="number" min="0" value="${p.xuat||''}" placeholder="${p.xuatAuto&&p.xuat?p.xuat:'0'}" style="${inputStyle};background:#fff5f5${p.xuatAuto?';color:#c53030':';color:#555'}" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','xuat',+this.value)" onfocus="this.select()" title="${p.xuatAuto?'Tự động từ dữ liệu bán':'Đã nhập tay'}">
-          ${p.xuatAuto&&p.xuat>0?`<div style="font-size:9px;color:#c53030;text-align:right">auto</div>`:''}
+        <td style="background:${tonDauBg};text-align:right" ${tonDauTitle}>
+          <input type="number" min="0" value="${tonDauVal}" placeholder="${tonDauPH}" style="${iStyle};background:${tonDauBg}${p.tonDauAuto?';color:#b7791f':''}"
+            onchange="invSave(${m},${y},'${tenSafe}','tonDau',+this.value)" onfocus="this.select()">
+          ${p.tonDauAuto?'<div style="font-size:9px;color:#b7791f;text-align:right">↩ tự động</div>':''}
         </td>
-        <td style="text-align:right;font-weight:700;font-size:13px;${tonCuoiCol}">${p.hasData?p.tonCuoi.toLocaleString('vi-VN'):'–'}</td>
-        <td style="text-align:right"><input type="number" min="0" value="${p.tonMin||''}" placeholder="0" style="${inputStyle}" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','tonMin',+this.value)" onfocus="this.select()"></td>
+        <td style="background:#f0fdf4;text-align:right">
+          <input type="number" min="0" value="${p.nhap||''}" placeholder="0" style="${iStyle};background:#f0fdf4"
+            onchange="invSave(${m},${y},'${tenSafe}','nhap',+this.value)" onfocus="this.select()">
+        </td>
+        <td style="background:#fff5f5;text-align:right">
+          <input type="number" min="0" value="${p.xuat||''}" placeholder="${p.xuatAuto&&p.xuat?p.xuat:'0'}" style="${iStyle};background:#fff5f5${p.xuatAuto?';color:#c53030':';color:#555'}"
+            onchange="invSave(${m},${y},'${tenSafe}','xuat',+this.value)" onfocus="this.select()" title="${p.xuatAuto?'Tự động từ dữ liệu bán':'Đã nhập tay'}">
+          ${p.xuatAuto&&p.xuat>0?'<div style="font-size:9px;color:#c53030;text-align:right">auto</div>':''}
+        </td>
+        <td style="text-align:right;font-weight:700;font-size:13px;${tonCuoiStyle}">${p.hasData?p.tonCuoi.toLocaleString('vi-VN'):'–'}</td>
+        <td style="text-align:right">
+          <input type="number" min="0" value="${p.tonMin||''}" placeholder="0" style="${iStyle}"
+            onchange="invSave(${m},${y},'${tenSafe}','tonMin',+this.value)" onfocus="this.select()">
+        </td>
         <td style="text-align:center"><span style="background:${p.sbg};color:${p.scl};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">${p.status}</span></td>
+        <td style="text-align:center"><button onclick="invDeleteProduct('${tenSafe}',${isCustom})" style="background:none;border:none;cursor:pointer;font-size:14px;padding:2px 6px;color:#aaa;border-radius:4px" title="Xóa sản phẩm">🗑️</button></td>
       </tr>`;
     });
   }
@@ -4474,8 +4537,43 @@ function renderInvTable(){
 
 function invSave(m,y,ten,field,val){
   saveInvCell(m,y,ten,field,isNaN(val)?0:val);
-  // Recalculate tồn cuối for that row without full re-render
   renderInvTable();
+}
+
+function invSaveMonth(){
+  const m=parseInt(document.getElementById('invMonth')?.value||1);
+  const y=parseInt(document.getElementById('invYear')?.value||2026);
+  // Dữ liệu đã tự động lưu qua invSave(); hiển thị xác nhận
+  const btn=document.querySelector('[onclick="invSaveMonth()"]');
+  if(btn){btn.textContent='✅ Đã lưu!';btn.style.background='#276749';setTimeout(()=>{btn.textContent='💾 Lưu tháng';btn.style.background='#38a169';},2000);}
+}
+
+function invAddProduct(){
+  const ten=(prompt('Tên sản phẩm mới:')||'').trim();
+  if(!ten) return;
+  const allCats=['BỘ DƯỠNG','HỆ THỐNG','MERCHANDISE','NGUYÊN LIỆU','NL ĐỘC QUYỀN','THANH LÝ','VD ĐỘC QUYỀN','VL ĐỘC QUYỀN'];
+  const cat=(prompt(`Nhóm hàng (nhập 1 trong các nhóm):\n${allCats.join(' / ')}`)||'NGUYÊN LIỆU').trim();
+  const dvt=(prompt('Đơn vị tính (Gói / Hộp / Kg / Lít / Cái / ...):','Cái')||'Cái').trim();
+  const custom=getCustomProducts();
+  if(custom.some(p=>p.ten.toLowerCase()===ten.toLowerCase())){
+    alert('Sản phẩm đã tồn tại!');return;
+  }
+  custom.push({ten,cat,dvt});
+  localStorage.setItem(INV_CUSTOM_KEY,JSON.stringify(custom));
+  initInvTab();
+}
+
+function invDeleteProduct(ten,isCustom){
+  if(!confirm(`Xóa "${ten}" khỏi danh sách tồn kho?\n(Dữ liệu đã nhập sẽ được giữ lại)`)) return;
+  if(isCustom){
+    const custom=getCustomProducts().filter(p=>p.ten!==ten);
+    localStorage.setItem(INV_CUSTOM_KEY,JSON.stringify(custom));
+  } else {
+    const hidden=getHiddenProducts();
+    if(!hidden.includes(ten)) hidden.push(ten);
+    localStorage.setItem(INV_HIDDEN_KEY,JSON.stringify(hidden));
+  }
+  initInvTab();
 }
 
 function invCopyPrevMonth(){
@@ -4483,7 +4581,7 @@ function invCopyPrevMonth(){
   const y=parseInt(document.getElementById('invYear')?.value||2026);
   let pm=m-1,py=y;
   if(pm<=0){pm=12;py--;}
-  const all=loadInvData(m,y);
+  const all=loadInvData();
   const prevKey=invKey(pm,py);
   const curKey=invKey(m,y);
   if(!all[prevKey]||!Object.keys(all[prevKey]).length){
@@ -4491,7 +4589,7 @@ function invCopyPrevMonth(){
   }
   if(!confirm(`Sao chép Tồn cuối T${pm}/${py} → Tồn đầu T${m}/${y}?`))return;
   if(!all[curKey])all[curKey]={};
-  INV_PRODUCTS.forEach(p=>{
+  getEffectiveProducts().forEach(p=>{
     const prev=all[prevKey]?.[p.ten];
     if(!prev)return;
     const prevTonDau=prev.tonDau??0,prevNhap=prev.nhap??0,prevXuat=prev.xuat??getXuatKho(p.ten,pm,py);
@@ -4508,13 +4606,14 @@ function exportInvExcel(){
   if(typeof XLSX==='undefined'){alert('Thư viện Excel chưa tải xong.');return;}
   const m=parseInt(document.getElementById('invMonth')?.value||1);
   const y=parseInt(document.getElementById('invYear')?.value||2026);
-  const all=loadInvData(m,y);
+  const all=loadInvData();
   const wb=XLSX.utils.book_new();
   const header=['#','Phân loại','Tên hàng','ĐVT','Tồn đầu kỳ','Nhập kho','Xuất kho','Tồn cuối kỳ','Tồn tối thiểu','Trạng thái'];
   const wsData=[[`BÁO CÁO TỒN KHO – Tháng ${m}/${y}`],[],header];
   let n=0,curCat='';
-  INV_PRODUCTS.forEach(p=>{
-    const tonDau=getInvCell(all,m,y,p.ten,'tonDau')??0;
+  getEffectiveProducts().forEach(p=>{
+    const tonDauObj=getAutoTonDau(all,m,y,p.ten);
+    const tonDau=tonDauObj.val??0;
     const nhap=getInvCell(all,m,y,p.ten,'nhap')??0;
     const xuatOv=getInvCell(all,m,y,p.ten,'xuat');
     const xuat=xuatOv!==null?xuatOv:getXuatKho(p.ten,m,y);
