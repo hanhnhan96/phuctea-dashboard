@@ -255,6 +255,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('kpi',this)">🎯 KPI Mục tiêu</div>
   <div class="tab" onclick="showTab('noxau',this)">💸 Nợ xấu</div>
   <div class="tab" onclick="showTab('plan',this)">📊 Kế hoạch SL</div>
+  <div class="tab" onclick="showTab('inv',this)">📦 Tồn Kho</div>
 </div>
 
 <div class="main">
@@ -930,6 +931,66 @@ tr:last-child td{border-bottom:none}
     </table>
   </div>
   <div id="nxNote" style="margin-top:10px;font-size:11px;color:#aaa"></div>
+</div>
+
+<!-- ===== PAGE TỒN KHO ===== -->
+<div class="page" id="page-inv">
+  <p class="stitle">📦 Quản Lý Hàng Tồn Kho</p>
+
+  <!-- Toolbar -->
+  <div style="background:#f0f7f2;border:1px solid #b7dfc8;border-radius:12px;padding:14px 18px;margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+    <div class="fg"><label>📅 Tháng</label>
+      <select id="invMonth" style="border:1px solid #b7dfc8;border-radius:6px;padding:5px 9px;font-size:12px;outline:none;background:#fff" onchange="renderInvTable()">
+        <option value="1">T1</option><option value="2">T2</option><option value="3">T3</option><option value="4">T4</option><option value="5">T5</option><option value="6">T6</option>
+        <option value="7">T7</option><option value="8">T8</option><option value="9">T9</option><option value="10">T10</option><option value="11">T11</option><option value="12">T12</option>
+      </select>
+      <select id="invYear" style="border:1px solid #b7dfc8;border-radius:6px;padding:5px 9px;font-size:12px;outline:none;background:#fff" onchange="renderInvTable()">
+        <option value="2026">2026</option><option value="2025">2025</option>
+      </select>
+    </div>
+    <div class="fg"><label>🗂️ Nhóm</label>
+      <select id="invCat" style="border:1px solid #b7dfc8;border-radius:6px;padding:5px 9px;font-size:12px;outline:none;background:#fff" onchange="renderInvTable()">
+        <option value="">Tất cả</option>
+      </select>
+    </div>
+    <div class="fg"><label>🔍</label>
+      <input id="invSearch" type="text" placeholder="Tìm sản phẩm..." style="border:1px solid #b7dfc8;border-radius:6px;padding:5px 9px;font-size:12px;outline:none;width:180px" oninput="renderInvTable()">
+    </div>
+    <div class="fg"><label>Hiển thị</label>
+      <select id="invShowMode" style="border:1px solid #b7dfc8;border-radius:6px;padding:5px 9px;font-size:12px;outline:none;background:#fff" onchange="renderInvTable()">
+        <option value="all">Tất cả SP</option>
+        <option value="active">Có dữ liệu</option>
+        <option value="low">⚠️ Sắp hết / Hết</option>
+      </select>
+    </div>
+    <button class="btn" style="padding:6px 14px;font-size:12px" onclick="invCopyPrevMonth()">📋 Sao chép tháng trước</button>
+    <button class="btn" style="padding:6px 14px;font-size:12px;background:#2b6cb0" onclick="exportInvExcel()">⬇️ Excel</button>
+  </div>
+
+  <!-- KPI chips -->
+  <div id="invSummary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
+
+  <!-- Table -->
+  <div class="cc" style="padding:0">
+    <div class="tbl-wrap" style="max-height:600px">
+      <table id="invTable" style="font-size:12px">
+        <thead><tr>
+          <th style="text-align:center;width:30px">#</th>
+          <th style="min-width:160px">Sản phẩm</th>
+          <th style="width:110px">Nhóm</th>
+          <th style="text-align:center;width:55px">ĐVT</th>
+          <th style="text-align:right;width:90px;background:#ebf8ff;color:#2b6cb0">Tồn đầu kỳ</th>
+          <th style="text-align:right;width:90px;background:#e8f5ee;color:#1a6b3c">Nhập kho</th>
+          <th style="text-align:right;width:90px;background:#fff0f0;color:#c53030">Xuất kho</th>
+          <th style="text-align:right;width:90px;background:#fffbea;color:#7a5800;font-weight:700">Tồn cuối kỳ</th>
+          <th style="text-align:right;width:80px">Tồn tối thiểu</th>
+          <th style="text-align:center;width:110px">Trạng thái</th>
+        </tr></thead>
+        <tbody id="invTbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div style="font-size:11px;color:#aaa;margin-top:8px">💡 Nhấn vào ô <b>Tồn đầu</b>, <b>Nhập kho</b>, <b>Tồn tối thiểu</b> để chỉnh sửa. Xuất kho tự động lấy từ dữ liệu bán hàng.</div>
 </div>
 
 <!-- ===== PAGE KẾ HOẠCH SẢN LƯỢNG ===== -->
@@ -3154,6 +3215,7 @@ function showTab(name,el){
     _planData=[];_editingPlanId=null;
     renderSavedPlanList();
   }
+  if(name==='inv') initInvTab();
 }
 
 
@@ -3801,19 +3863,25 @@ function computePlan(){
   const prodMap={};
   hist.forEach(r=>{
     const rawName=r.sanPham||'(Không xác định)';
-    const k=smartMerge?normalizeSPName(rawName):rawName;
+    const normalized=smartMerge?normalizeSPName(rawName):rawName;
+    // Dùng lowercase làm key để gộp tên in hoa/thường khác nhau
+    const k=smartMerge?normalized.toLowerCase():rawName;
     if(!prodMap[k]){
       prodMap[k]={
+        displayName:normalized,  // giữ tên hiển thị từ lần đầu gặp
         cat:r.loaiHang||'Khác',
         dt:0,sl:0,
         monthSet:new Set(),
-        variants:new Set()  // tên gốc các biến thể
+        variants:new Set()
       };
     }
+    // Ưu tiên tên ngắn hơn (thường là tên gốc không có hậu tố)
+    if(normalized.length<prodMap[k].displayName.length) prodMap[k].displayName=normalized;
     prodMap[k].dt+=(r.thanhTien||0);
     prodMap[k].sl+=(r.sl||0);
     prodMap[k].monthSet.add(`${r.nam}-${r.thang}`);
-    if(rawName!==k) prodMap[k].variants.add(rawName);
+    // Ghi nhận biến thể: khác key (tức là đã normalize/lowercase khác tên gốc)
+    if(rawName!==prodMap[k].displayName) prodMap[k].variants.add(rawName);
   });
 
   const totalDT=Object.values(prodMap).reduce((s,p)=>s+p.dt,0);
@@ -3822,7 +3890,8 @@ function computePlan(){
   // Tính kế hoạch
   _planData=Object.entries(prodMap)
     .filter(([,p])=>p.sl>0&&p.dt>0)
-    .map(([ten,p])=>{
+    .map(([,p])=>{
+      const ten=p.displayName;
       const share=totalDT>0?p.dt/totalDT:0;
       const avgPrice=p.sl>0?p.dt/p.sl:0;
       const dtTB=p.dt/nMonths; // DT TB mỗi tháng
@@ -4132,6 +4201,334 @@ function exportPlanExcel(){
 
   const fname=`KH_SanLuong_T${meta.targetMonth||''}_${meta.targetYear||''}.xlsx`;
   XLSX.writeFile(wb,fname);
+}
+
+// ===== QUẢN LÝ TỒN KHO =====
+const INV_PRODUCTS=[
+  {cat:'BỘ DƯỠNG',ten:'Đông Trùng Tứ Vị (Dưỡng Thận)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Trà Ngũ Hắc (Dưỡng Tóc)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Thất Nguyên Đông Trùng (Dưỡng Tâm)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Mộc Hương Tĩnh (Dưỡng Thanh Hương)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Hương Quế Hoàng Cam (Dưỡng Phế)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Bách Nhật Tinh Hoa (Dưỡng Gan)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Dưỡng Nhan Thất Vị (Dưỡng Thần)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Bổ Huyết Ngũ Thảo (Dưỡng Khí)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Quý Phi Ngũ Thảo (Dưỡng Sắc)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Thực Khang Thảo (Dưỡng An Bụng)',dvt:'Gói'},
+  {cat:'BỘ DƯỠNG',ten:'Long Nhãn',dvt:'Kg'},
+  {cat:'BỘ DƯỠNG',ten:'Hoa Cúc Đường Phèn',dvt:'Viên'},
+  {cat:'HỆ THỐNG',ten:'Băng Keo Trong 1,2cm',dvt:'Cuộn'},
+  {cat:'HỆ THỐNG',ten:'Bình Bạc 8L',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Bình Giữ Nhiệt 2L',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Bình Ủ 5L Đựng Trà',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Bộ Tranh Led 60x80 (3 Tranh + 1 Bộ Nguồn)',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Ca Đong 100ml',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Ca Đong 250ml',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Ca Đong 500ml',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Ca Đong Inox 2L',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Cây Dầm Inox',dvt:'Cây'},
+  {cat:'HỆ THỐNG',ten:'Cây Quết Kem 20cm',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Chai Mực Đỏ Stamp Ink (28ml)',dvt:'Chai'},
+  {cat:'HỆ THỐNG',ten:'Chuông Báo Nước Inox',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'COMBO MỘC TÍCH ĐIỂM',dvt:'Combo'},
+  {cat:'HỆ THỐNG',ten:'Cuộn In Bill K57x38',dvt:'Cuộn'},
+  {cat:'HỆ THỐNG',ten:'Cuộn In Bill K8080',dvt:'Cuộn'},
+  {cat:'HỆ THỐNG',ten:'Cuộn In Tem T5030',dvt:'Cuộn'},
+  {cat:'HỆ THỐNG',ten:'Gấu Bông Noel The Hoa',dvt:'Con'},
+  {cat:'HỆ THỐNG',ten:'Hộp Chống Ồn',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Kẹp Tóc The Hoa',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Két Tiền Lớn',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Khay 9 Ngăn 2 Tầng',dvt:'Khay'},
+  {cat:'HỆ THỐNG',ten:'Khay Đựng Bột 3 Hủ Nhựa',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Khay Đựng Đa Năng 6 Ngăn',dvt:'Khay'},
+  {cat:'HỆ THỐNG',ten:'Khay Topping Inox',dvt:'Khay'},
+  {cat:'HỆ THỐNG',ten:'Khay Úp Ly Mica',dvt:'Khay'},
+  {cat:'HỆ THỐNG',ten:'Khăn Lau Đa Năng',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Loa Báo Chuyển Khoản',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Bom Bong Bóng',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Định Lượng Đường',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Ép Ly Thủ Công',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Ép Ly Tự Động 2025',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Ép Ly Tự Động Fest RC - 995s',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy In Bill ITP86',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy In Tem ITP3350',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Ipos Cầm Tay B10',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Pos IAP250',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy xay đa năng',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Máy Xay Trà Promix',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Mâm Chống Trượt 35cm',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Mộc Chữ Nhật Tên Cửa Hàng',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Mộc Trà Dưỡng The Hoa',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Mộc Tròn Mã Cửa Hàng',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Nồi Nấu Trân Châu Tự Động 16l',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Nồi Nấu Trân Châu Tự Động 8L Yubann',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Shaker Nhựa Vạch Đen 500ml',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Shaker Nhựa Vạch Đen 700ml',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Sơn Bê Tông 1 Bộ (20kg)',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Sơn Bê Tông 1 Bộ (5kg)',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Sơn Vàng Ngoại Thất (20kg)',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Sơn Xám Nội Thất (20kg)',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Sơn Xám Nội Thất (5kg)',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Standee 2 Mặt Chân Nước',dvt:'Bộ'},
+  {cat:'HỆ THỐNG',ten:'Thảm Pha Chế Lớn 45x30',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Thảm Pha Chế Nhỏ 8x60',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Thảm Pha Chế Vừa 30x15',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Thẻ Tích Điểm',dvt:'Hộp (100 tờ)'},
+  {cat:'HỆ THỐNG',ten:'Thìa Pha Chế Inox',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Thùng đá inox (500*400*500)',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Vá Có Lỗ',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Vá Không Lỗ',dvt:'Cái'},
+  {cat:'HỆ THỐNG',ten:'Xúc Đá Inox',dvt:'Cái'},
+  {cat:'MERCHANDISE',ten:'Combo 10 Móc Khoá Ngựa - Phúc Tea 2026',dvt:'Combo'},
+  {cat:'MERCHANDISE',ten:'Combo 10 Móc Khoá Ngựa 2026',dvt:'Combo'},
+  {cat:'MERCHANDISE',ten:'Combo 50 Popsocket HAPPITEA',dvt:'Combo'},
+  {cat:'MERCHANDISE',ten:'Combo 50 Hươu Đỡ Điện Thoại - Popsocket',dvt:'Combo'},
+  {cat:'MERCHANDISE',ten:'100 Bong Bóng Phúc Tea 2025',dvt:'Combo'},
+  {cat:'MERCHANDISE',ten:'Túi Tote Basic',dvt:'Cái'},
+  {cat:'MERCHANDISE',ten:'Capybara Móc Khóa 15cm',dvt:'Con'},
+  {cat:'MERCHANDISE',ten:'Capybara 25cm Ngẫu Nhiên',dvt:'Con'},
+  {cat:'MERCHANDISE',ten:'Gấu Capybara Bigsize 40cm',dvt:'Con'},
+  {cat:'MERCHANDISE',ten:'Nón bảo hiểm sừng hươu',dvt:'Cái'},
+  {cat:'MERCHANDISE',ten:'Ly Đổi Màu (710ml)',dvt:'Cái'},
+  {cat:'MERCHANDISE',ten:'Bút Bi Phúc Tea',dvt:'Cây'},
+  {cat:'MERCHANDISE',ten:'Khẩu Trang Y Tế Phúc Tea',dvt:'Bịch (10 cái)'},
+  {cat:'MERCHANDISE',ten:'Nón bảo hiểm kính phi công Phúc Tea',dvt:'Cái'},
+  {cat:'MERCHANDISE',ten:'Nón bảo hiểm Phúc Tea',dvt:'Cái'},
+  {cat:'MERCHANDISE',ten:'Bút chì Phúc Tea',dvt:'Cây'},
+  {cat:'MERCHANDISE',ten:'Túi Ship 45 Lít',dvt:'Túi'},
+  {cat:'NGUYÊN LIỆU',ten:'Trà Oolong Nhài',dvt:'500gr'},
+  {cat:'NGUYÊN LIỆU',ten:'Trà Oolong Ngọc Phong Lan',dvt:'500gr'},
+  {cat:'NGUYÊN LIỆU',ten:'Trà Long Tỉnh Ngao Xuân',dvt:'500gr'},
+  {cat:'NGUYÊN LIỆU',ten:'Trà Oolong Sen',dvt:'500gr'},
+  {cat:'NGUYÊN LIỆU',ten:'Trà Đen Sài Gòn',dvt:'500gr'},
+  {cat:'NL ĐỘC QUYỀN',ten:'Trà Gạo Rang Phúc Tea',dvt:'1kg'},
+  {cat:'NL ĐỘC QUYỀN',ten:'Trà Oolong Sữa',dvt:'500gr'},
+  {cat:'NL ĐỘC QUYỀN',ten:'Trà Xanh Shan Tuyết',dvt:'500gr'},
+  {cat:'NL ĐỘC QUYỀN',ten:'Trà Oolong Camelia',dvt:'500gr'},
+  {cat:'NL ĐỘC QUYỀN',ten:'Cà Phê Mộc 9:1',dvt:'Kg'},
+  {cat:'NL ĐỘC QUYỀN',ten:'Trà Xanh Lài Phúc Tea',dvt:'Bịch'},
+  {cat:'THANH LÝ',ten:'Nồi Nấu Trân Châu Tự Động 16l (Thanh lý)',dvt:'Cái'},
+  {cat:'THANH LÝ',ten:'Máy Định Lượng Đường (Thanh lý)',dvt:'Cái'},
+  {cat:'THANH LÝ',ten:'Lồng Đèn Con Hươu 2024 (10 Cái)',dvt:'Combo'},
+  {cat:'THANH LÝ',ten:'Lồng Đèn Con Cá 2024 (10 Cái)',dvt:'Combo'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Khoác Ship',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Mưa Phúc Tea',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự 2024 (L)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự 2024 (M)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự 2024 (S)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự 2024 (XL)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự 2024 (XXL)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự The Hoa 2025 (L)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự The Hoa 2025 (M)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự The Hoa 2025 (S)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự The Hoa 2025 (XL)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự The Hoa 2025 (XS)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Áo Nhân Sự The Hoa 2025 (XXL)',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Bảng Tên Nhân Sự',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Bảng Tên Nhân Sự The Hoa',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Bảng Tên Quản Lý The Hoa',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Dù Cầm Tay Phúc Tea 25.01',dvt:'Cây'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Đồng Phục Bếp',dvt:'Bộ'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Nón Sừng Hươu Nhân Sự',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Nón Tai Bèo The Hoa',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Tạp Dề Đen Trơn The Hoa',dvt:'Cái'},
+  {cat:'VD ĐỘC QUYỀN',ten:'Tạp Dề Nhân Sự 2025',dvt:'Cái'},
+  {cat:'VL ĐỘC QUYỀN',ten:'Combo Thùng Túi 12 Ly The Hoa',dvt:'Combo'},
+  {cat:'VL ĐỘC QUYỀN',ten:'Khay Đế Ly Carton 4 Ngăn',dvt:'Khay'},
+  {cat:'VL ĐỘC QUYỀN',ten:'Túi Giấy Hồng The Hoa',dvt:'Cái'},
+];
+
+const INV_KEY='phuctea_inv_data';
+
+function invKey(m,y){return `${y}-${String(m).padStart(2,'0')}`;}
+
+function loadInvData(m,y){
+  try{return JSON.parse(localStorage.getItem(INV_KEY)||'{}');}catch{return{};}
+}
+function saveInvCell(m,y,ten,field,val){
+  const all=loadInvData(m,y);
+  const k=invKey(m,y);
+  if(!all[k])all[k]={};
+  if(!all[k][ten])all[k][ten]={};
+  all[k][ten][field]=val;
+  localStorage.setItem(INV_KEY,JSON.stringify(all));
+}
+function getInvCell(all,m,y,ten,field){
+  return all?.[invKey(m,y)]?.[ten]?.[field]??null;
+}
+
+// Lấy xuất kho từ dữ liệu bán hàng (tổng SL bán trong tháng)
+function getXuatKho(ten,m,y){
+  const norm=s=>(s||'').toLowerCase().replace(/\s+/g,' ').trim();
+  const nTen=norm(ten);
+  return D_ALL.filter(r=>{
+    if(r.thang!==m||r.nam!==y||!r.sanPham)return false;
+    const ns=norm(r.sanPham);
+    return ns===nTen||ns.includes(nTen)||nTen.includes(ns);
+  }).reduce((s,r)=>s+(r.sl||0),0);
+}
+
+function initInvTab(){
+  // Set current month
+  const now=new Date();
+  const mEl=document.getElementById('invMonth');
+  const yEl=document.getElementById('invYear');
+  if(mEl) mEl.value=now.getMonth()+1;
+  if(yEl) yEl.value=now.getFullYear();
+  // Populate category filter
+  const cats=[...new Set(INV_PRODUCTS.map(p=>p.cat))].sort();
+  const catEl=document.getElementById('invCat');
+  if(catEl){
+    catEl.innerHTML='<option value="">Tất cả</option>';
+    cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;catEl.appendChild(o);});
+  }
+  renderInvTable();
+}
+
+function renderInvTable(){
+  const m=parseInt(document.getElementById('invMonth')?.value||new Date().getMonth()+1);
+  const y=parseInt(document.getElementById('invYear')?.value||new Date().getFullYear());
+  const cat=document.getElementById('invCat')?.value||'';
+  const search=(document.getElementById('invSearch')?.value||'').toLowerCase().trim();
+  const mode=document.getElementById('invShowMode')?.value||'all';
+
+  const all=loadInvData(m,y);
+  const fN=n=>n===null||n===undefined?'':Number(n).toLocaleString('vi-VN');
+
+  let rows=INV_PRODUCTS.filter(p=>{
+    if(cat&&p.cat!==cat)return false;
+    if(search&&!p.ten.toLowerCase().includes(search)&&!p.cat.toLowerCase().includes(search))return false;
+    return true;
+  });
+
+  // Tính data cho từng sản phẩm
+  const computed=rows.map(p=>{
+    const tonDau=getInvCell(all,m,y,p.ten,'tonDau')??0;
+    const nhap=getInvCell(all,m,y,p.ten,'nhap')??0;
+    const xuatOverride=getInvCell(all,m,y,p.ten,'xuat');
+    const xuat=xuatOverride!==null?xuatOverride:getXuatKho(p.ten,m,y);
+    const tonMin=getInvCell(all,m,y,p.ten,'tonMin')??0;
+    const tonCuoi=tonDau+nhap-xuat;
+    const hasData=tonDau>0||nhap>0||xuat>0||tonMin>0;
+    let status='',sbg='',scl='';
+    if(!hasData){status='–';sbg='#f8fafc';scl='#aaa';}
+    else if(tonCuoi<=0){status='🔴 Hết hàng';sbg='#fff0f0';scl='#c53030';}
+    else if(tonMin>0&&tonCuoi<=tonMin){status='⚠️ Sắp hết';sbg='#fffbea';scl='#7a5800';}
+    else{status='✅ Đủ hàng';sbg='#e8f5ee';scl='#1a6b3c';}
+    return{...p,tonDau,nhap,xuat,tonMin,tonCuoi,hasData,status,sbg,scl,xuatAuto:xuatOverride===null};
+  });
+
+  // Filter theo mode
+  const filtered=mode==='active'?computed.filter(p=>p.hasData)
+    :mode==='low'?computed.filter(p=>p.hasData&&(p.tonCuoi<=0||(p.tonMin>0&&p.tonCuoi<=p.tonMin)))
+    :computed;
+
+  // KPI
+  const withData=computed.filter(p=>p.hasData);
+  const du=withData.filter(p=>p.status.includes('Đủ')).length;
+  const sapHet=withData.filter(p=>p.status.includes('Sắp')).length;
+  const het=withData.filter(p=>p.status.includes('Hết hàng')).length;
+  const chip=(t,bg,cl)=>`<span style="background:${bg};color:${cl};padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700">${t}</span>`;
+  document.getElementById('invSummary').innerHTML=
+    chip(`📦 ${withData.length} SP có dữ liệu`,'#ebf8ff','#2b6cb0')+' '+
+    chip(`✅ Đủ hàng: ${du}`,'#e8f5ee','#1a6b3c')+' '+
+    (sapHet?chip(`⚠️ Sắp hết: ${sapHet}`,'#fffbea','#7a5800')+' ':'')+
+    (het?chip(`🔴 Hết hàng: ${het}`,'#fff0f0','#c53030')+' ':'')+
+    chip(`📅 T${m}/${y}`,'#f8fafc','#555');
+
+  // Render table
+  const catColors={'BỘ DƯỠNG':'#6b21a8','HỆ THỐNG':'#2b6cb0','MERCHANDISE':'#c05621','NGUYÊN LIỆU':'#2c7a7b','NL ĐỘC QUYỀN':'#1a6b3c','THANH LÝ':'#718096','VD ĐỘC QUYỀN':'#d69e2e','VL ĐỘC QUYỀN':'#c53030'};
+  let tb='',curCat='',n=0;
+
+  if(!filtered.length){
+    tb='<tr><td colspan="10" style="text-align:center;color:#aaa;padding:30px">Không có sản phẩm nào</td></tr>';
+  } else {
+    filtered.forEach(p=>{
+      if(p.cat!==curCat){
+        curCat=p.cat;
+        const cl=catColors[p.cat]||'#555';
+        tb+=`<tr style="background:#f0f7f2"><td colspan="10" style="padding:5px 12px;font-weight:700;font-size:11px;color:${cl};letter-spacing:.4px">📁 ${p.cat}</td></tr>`;
+      }
+      n++;
+      const tonCuoiCol=p.tonCuoi<0?'color:#c53030':p.tonCuoi===0&&p.hasData?'color:#c53030':'color:#d69e2e;font-weight:700';
+      const inputStyle='width:70px;text-align:right;border:1px solid #ddd;border-radius:4px;padding:3px 5px;font-size:11px;outline:none';
+      tb+=`<tr>
+        <td style="text-align:center;color:#aaa;font-size:11px">${n}</td>
+        <td style="font-weight:600;font-size:12px">${p.ten}</td>
+        <td><span style="font-size:10px;color:${catColors[p.cat]||'#555'};font-weight:600">${p.cat}</span></td>
+        <td style="text-align:center;color:#888;font-size:11px">${p.dvt}</td>
+        <td style="background:#f0f9ff;text-align:right"><input type="number" min="0" value="${p.tonDau||''}" placeholder="0" style="${inputStyle};background:#f0f9ff" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','tonDau',+this.value)" onfocus="this.select()"></td>
+        <td style="background:#f0fdf4;text-align:right"><input type="number" min="0" value="${p.nhap||''}" placeholder="0" style="${inputStyle};background:#f0fdf4" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','nhap',+this.value)" onfocus="this.select()"></td>
+        <td style="background:#fff5f5;text-align:right">
+          <input type="number" min="0" value="${p.xuat||''}" placeholder="${p.xuatAuto&&p.xuat?p.xuat:'0'}" style="${inputStyle};background:#fff5f5${p.xuatAuto?';color:#c53030':';color:#555'}" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','xuat',+this.value)" onfocus="this.select()" title="${p.xuatAuto?'Tự động từ dữ liệu bán':'Đã nhập tay'}">
+          ${p.xuatAuto&&p.xuat>0?`<div style="font-size:9px;color:#c53030;text-align:right">auto</div>`:''}
+        </td>
+        <td style="text-align:right;font-weight:700;font-size:13px;${tonCuoiCol}">${p.hasData?p.tonCuoi.toLocaleString('vi-VN'):'–'}</td>
+        <td style="text-align:right"><input type="number" min="0" value="${p.tonMin||''}" placeholder="0" style="${inputStyle}" onchange="invSave(${m},${y},'${p.ten.replace(/'/g,"\\'")}','tonMin',+this.value)" onfocus="this.select()"></td>
+        <td style="text-align:center"><span style="background:${p.sbg};color:${p.scl};padding:2px 8px;border-radius:4px;font-size:10px;font-weight:700">${p.status}</span></td>
+      </tr>`;
+    });
+  }
+  document.getElementById('invTbody').innerHTML=tb;
+}
+
+function invSave(m,y,ten,field,val){
+  saveInvCell(m,y,ten,field,isNaN(val)?0:val);
+  // Recalculate tồn cuối for that row without full re-render
+  renderInvTable();
+}
+
+function invCopyPrevMonth(){
+  const m=parseInt(document.getElementById('invMonth')?.value||1);
+  const y=parseInt(document.getElementById('invYear')?.value||2026);
+  let pm=m-1,py=y;
+  if(pm<=0){pm=12;py--;}
+  const all=loadInvData(m,y);
+  const prevKey=invKey(pm,py);
+  const curKey=invKey(m,y);
+  if(!all[prevKey]||!Object.keys(all[prevKey]).length){
+    alert(`Không có dữ liệu tháng ${pm}/${py} để sao chép.`);return;
+  }
+  if(!confirm(`Sao chép Tồn cuối T${pm}/${py} → Tồn đầu T${m}/${y}?`))return;
+  if(!all[curKey])all[curKey]={};
+  INV_PRODUCTS.forEach(p=>{
+    const prev=all[prevKey]?.[p.ten];
+    if(!prev)return;
+    const prevTonDau=prev.tonDau??0,prevNhap=prev.nhap??0,prevXuat=prev.xuat??getXuatKho(p.ten,pm,py);
+    const prevTonCuoi=prevTonDau+prevNhap-prevXuat;
+    if(!all[curKey][p.ten])all[curKey][p.ten]={};
+    all[curKey][p.ten].tonDau=prevTonCuoi;
+  });
+  localStorage.setItem(INV_KEY,JSON.stringify(all));
+  renderInvTable();
+  alert('✅ Đã sao chép tồn cuối tháng trước làm tồn đầu kỳ!');
+}
+
+function exportInvExcel(){
+  if(typeof XLSX==='undefined'){alert('Thư viện Excel chưa tải xong.');return;}
+  const m=parseInt(document.getElementById('invMonth')?.value||1);
+  const y=parseInt(document.getElementById('invYear')?.value||2026);
+  const all=loadInvData(m,y);
+  const wb=XLSX.utils.book_new();
+  const header=['#','Phân loại','Tên hàng','ĐVT','Tồn đầu kỳ','Nhập kho','Xuất kho','Tồn cuối kỳ','Tồn tối thiểu','Trạng thái'];
+  const wsData=[[`BÁO CÁO TỒN KHO – Tháng ${m}/${y}`],[],header];
+  let n=0,curCat='';
+  INV_PRODUCTS.forEach(p=>{
+    const tonDau=getInvCell(all,m,y,p.ten,'tonDau')??0;
+    const nhap=getInvCell(all,m,y,p.ten,'nhap')??0;
+    const xuatOv=getInvCell(all,m,y,p.ten,'xuat');
+    const xuat=xuatOv!==null?xuatOv:getXuatKho(p.ten,m,y);
+    const tonMin=getInvCell(all,m,y,p.ten,'tonMin')??0;
+    const tonCuoi=tonDau+nhap-xuat;
+    const status=tonCuoi<=0?'Hết hàng':tonMin>0&&tonCuoi<=tonMin?'Sắp hết':'Đủ hàng';
+    if(p.cat!==curCat){curCat=p.cat;wsData.push([`📁 ${p.cat}`,'','','','','','','','','']);}
+    n++;
+    wsData.push([n,p.cat,p.ten,p.dvt,tonDau,nhap,xuat,tonCuoi,tonMin,status]);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols']=[{wch:4},{wch:16},{wch:42},{wch:14},{wch:12},{wch:12},{wch:12},{wch:12},{wch:14},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,`Tồn Kho T${m}_${y}`);
+  XLSX.writeFile(wb,`TonKho_T${m}_${y}.xlsx`);
 }
 
 // ===== KẾ HOẠCH ĐÃ LƯU =====
