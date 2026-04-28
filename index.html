@@ -730,7 +730,7 @@ tr:last-child td{border-bottom:none}
 
   <!-- PHÂN BỐ THỜI GIAN GIAO HÀNG -->
   <div class="card" style="margin-bottom:14px">
-    <div class="ch"><div class="ctitle">⏱️ Phân bố thời gian hoàn thành đơn</div><div class="csub">Chỉ tính đơn đã giao đủ (ngày làm việc, trừ T7 & CN)</div></div>
+    <div class="ch"><div class="ctitle">⏱️ Phân bố thời gian hoàn thành đơn</div><div class="csub">Tính đơn đã giao đủ ✅ và giao 1 phần 🔶 (ngày làm việc, trừ T7 &amp; CN)</div></div>
     <div id="ordDeliveryDist"></div>
   </div>
 
@@ -2950,28 +2950,32 @@ function renderOrderTrack(){
   // ===== PHÂN BỐ THỜI GIAN GIAO HÀNG =====
   const distEl=document.getElementById('ordDeliveryDist');
   if(distEl){
-    // Chỉ tính đơn đã gửi đủ (code==='sent')
-    const sentOrders=kpiRows.filter(o=>o.code==='sent');
+    // Tính cả đơn đã gửi đủ (sent) và giao 1 phần (partial) — đều có ngayGui
+    const doneOrders=kpiRows.filter(o=>(o.code==='sent'||o.code==='partial')&&o.ngayGui);
     const buckets=[
       {label:'1 – 3 ngày', min:1, max:3, bg:'#e8f5ee', cl:'#1a6b3c', icon:'🟢', orders:[]},
       {label:'4 – 5 ngày', min:4, max:5, bg:'#fff8e6', cl:'#7a5800', icon:'🟡', orders:[]},
       {label:'6 – 7 ngày', min:6, max:7, bg:'#fff3e0', cl:'#b45309', icon:'🟠', orders:[]},
       {label:'Trên 7 ngày',min:8, max:Infinity, bg:'#fff0f0', cl:'#c53030', icon:'🔴', orders:[]},
     ];
-    sentOrders.forEach(o=>{
+    doneOrders.forEach(o=>{
       const d1=new Date(o.ngay),d2=new Date(o.ngayGui);
       const gap=countWorkdays(d1,d2);
       o._gap=gap;
       const b=buckets.find(b=>gap>=b.min&&gap<=b.max);
       if(b) b.orders.push(o);
     });
-    const total=sentOrders.length;
+    const total=doneOrders.length;
+    const nSent=doneOrders.filter(o=>o.code==='sent').length;
+    const nPartial=doneOrders.filter(o=>o.code==='partial').length;
     if(!total){
       distEl.innerHTML='<div style="color:#aaa;font-size:12px;padding:12px 0">Chưa có đơn nào hoàn thành trong khoảng lọc.</div>';
     } else {
       let dh=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:10px">`;
       buckets.forEach((b,bi)=>{
         const pct=total>0?Math.round(b.orders.length/total*100):0;
+        const nS=b.orders.filter(o=>o.code==='sent').length;
+        const nP=b.orders.filter(o=>o.code==='partial').length;
         const sid=`distList_${bi}`;
         // Danh sách CH
         let listHtml='';
@@ -2980,16 +2984,24 @@ function renderOrderTrack(){
           b.orders.sort((a,z)=>a._gap-z._gap||(a.chiNhanh>z.chiNhanh?1:-1)).forEach(o=>{
             const sn=o.chiNhanh.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
             const tl=ORD_TYPE_LABEL[o.ordType]||{label:o.ordType,bg:'#f5f5f5',cl:'#555'};
+            const partialTag=o.code==='partial'
+              ?`<span style="background:#fff3e0;color:#b45309;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:700;margin-left:3px">🔶 ${o.countGui}/${o.soSP} SP</span>`
+              :'';
             listHtml+=`<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid ${b.cl}18;font-size:11px">
-              <div>
+              <div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px">
                 <span style="font-weight:700;color:#333">${sn}</span>
-                <span style="background:${tl.bg};color:${tl.cl};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:4px">${tl.label}</span>
+                <span style="background:${tl.bg};color:${tl.cl};padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700">${tl.label}</span>
+                ${partialTag}
               </div>
               <div style="color:${b.cl};font-weight:700;white-space:nowrap;margin-left:8px">${o._gap} ngày</div>
             </div>`;
           });
           listHtml+=`</div>`;
         }
+        // Breakdown line: sent + partial counts
+        const breakdownHtml=nP>0
+          ?`<div style="font-size:9px;color:${b.cl};opacity:.75;margin-top:2px">✅ ${nS} đủ &nbsp;🔶 ${nP} 1 phần</div>`
+          :'';
         dh+=`<div style="background:${b.bg};border-radius:10px;padding:14px 16px;text-align:center">
           <div style="font-size:22px;margin-bottom:4px">${b.icon}</div>
           <div style="font-size:11px;font-weight:700;color:${b.cl};margin-bottom:6px">${b.label}</div>
@@ -2997,6 +3009,7 @@ function renderOrderTrack(){
                onclick="${b.orders.length?`(function(){var e=document.getElementById('${sid}');e.style.display=e.style.display==='none'?'block':'none';})()`:''}">
             ${b.orders.length}
           </div>
+          ${breakdownHtml}
           <div style="font-size:11px;color:${b.cl};opacity:.8;margin-top:4px">${pct}% tổng đơn</div>
           <div style="background:#0001;border-radius:4px;height:5px;margin-top:8px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${b.cl};border-radius:4px;opacity:.7"></div>
@@ -3004,8 +3017,10 @@ function renderOrderTrack(){
           ${listHtml}
         </div>`;
       });
+      // Footer: total breakdown
+      const footerPartial=nPartial>0?` &nbsp;(✅ ${nSent} giao đủ &nbsp;+&nbsp; 🔶 ${nPartial} giao 1 phần)`:'';
       dh+=`</div>
-      <div style="margin-top:8px;font-size:11px;color:#aaa;text-align:right">Tổng đơn hoàn thành: <b style="color:#555">${total}</b></div>`;
+      <div style="margin-top:8px;font-size:11px;color:#aaa;text-align:right">Tổng đơn đã giao: <b style="color:#555">${total}</b>${footerPartial}</div>`;
       distEl.innerHTML=dh;
     }
   }
