@@ -3008,7 +3008,7 @@ function renderOrderTrack(){
       .map(o=>({...o,_gap:countWorkdays(new Date(o.ngay),new Date(o.ngayGui))}));
 
     const buckets=[
-      {label:'1 – 3 ngày', min:1, max:3, bg:'#e8f5ee', cl:'#1a6b3c', icon:'🟢', orders:[]},
+      {label:'≤ 3 ngày',  min:0, max:3, bg:'#e8f5ee', cl:'#1a6b3c', icon:'🟢', orders:[]},
       {label:'4 – 5 ngày', min:4, max:5, bg:'#fff8e6', cl:'#7a5800', icon:'🟡', orders:[]},
       {label:'6 – 7 ngày', min:6, max:7, bg:'#fff3e0', cl:'#b45309', icon:'🟠', orders:[]},
       {label:'Trên 7 ngày',min:8, max:Infinity, bg:'#fff0f0', cl:'#c53030', icon:'🔴', orders:[]},
@@ -3016,9 +3016,26 @@ function renderOrderTrack(){
     sentOrders.forEach(o=>{
       const b=buckets.find(b=>o._gap>=b.min&&o._gap<=b.max);
       if(b) b.orders.push(o);
+      // else: gap âm (lỗi ngày) → bucket đầu
+      else buckets[0].orders.push(o);
     });
     // Tổng tất cả (5 ô) để tính %
     const totalAll=sentOrders.length+partialBucket.length;
+
+    // Largest-remainder để % luôn cộng = 100
+    function lrPct(counts, total){
+      if(!total) return counts.map(()=>0);
+      const raws=counts.map(c=>c/total*100);
+      const floors=raws.map(r=>Math.floor(r));
+      const diff=100-floors.reduce((s,f)=>s+f,0);
+      raws.map((r,i)=>({i,rem:r-floors[i]}))
+          .sort((a,b)=>b.rem-a.rem)
+          .slice(0,diff)
+          .forEach(({i})=>floors[i]++);
+      return floors;
+    }
+    const allCounts=[...buckets.map(b=>b.orders.length), partialBucket.length];
+    const allPcts=lrPct(allCounts, totalAll);
     const nSent=sentOrders.length;
     const nPartialComp=partialBucket.length;
 
@@ -3067,7 +3084,7 @@ function renderOrderTrack(){
 
         // 4 bucket thời gian
         buckets.forEach((b,bi)=>{
-          const pct=totalAll>0?Math.round(b.orders.length/totalAll*100):0;
+          const pct=allPcts[bi];
           const sid=`distList_${bi}`;
           let listHtml='';
           if(b.orders.length){
@@ -3094,7 +3111,7 @@ function renderOrderTrack(){
 
         // Ô thứ 5: Giao 1 phần
         {
-          const pct=totalAll>0?Math.round(partialBucket.length/totalAll*100):0;
+          const pct=allPcts[4];
           const sid='distList_partial';
           let listHtml='';
           if(partialBucket.length){
