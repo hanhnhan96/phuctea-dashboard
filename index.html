@@ -255,6 +255,7 @@ tr:last-child td{border-bottom:none}
   <div class="tab" onclick="showTab('noxau',this)">💸 Nợ xấu</div>
   <div class="tab" onclick="showTab('plan',this)">📊 Kế hoạch SL</div>
   <div class="tab" onclick="showTab('inv',this)">📦 Tồn Kho</div>
+  <div class="tab" onclick="showTab('nvlctrl',this)">🔬 Kiểm soát NVL</div>
 </div>
 
 <div class="main">
@@ -991,6 +992,54 @@ tr:last-child td{border-bottom:none}
     </div>
   </div>
   <div style="font-size:11px;color:#aaa;margin-top:8px">💡 Nhấn vào ô <b>Tồn đầu</b>, <b>Nhập kho</b>, <b>Tồn tối thiểu</b> để chỉnh sửa. Xuất kho tự động lấy từ dữ liệu bán hàng. Tồn cuối kỳ tự động làm Tồn đầu tháng sau.</div>
+</div>
+
+<!-- ===== PAGE KIỂM SOÁT NVL ===== -->
+<div class="page" id="page-nvlctrl">
+  <p class="stitle">🔬 Kiểm Soát Nguyên Vật Liệu Cửa Hàng</p>
+
+  <!-- Upload row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+    <div style="background:#f8fafc;border:2px dashed #bee3f8;border-radius:12px;padding:18px">
+      <div style="font-weight:700;font-size:14px;color:#2b6cb0;margin-bottom:6px">📋 File Công Thức NVL</div>
+      <div style="font-size:11px;color:#718096;margin-bottom:4px">Upload 1 lần — lưu vĩnh viễn</div>
+      <div id="nvlRecipeStatus" style="font-size:12px;color:#888;margin-bottom:12px;min-height:32px">Chưa có dữ liệu</div>
+      <label style="display:inline-block;cursor:pointer;background:#3182ce;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">
+        📁 Chọn file Excel
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="nvlUploadRecipe(this)">
+      </label>
+    </div>
+    <div style="background:#f8fafc;border:2px dashed #c6f6d5;border-radius:12px;padding:18px">
+      <div style="font-weight:700;font-size:14px;color:#276749;margin-bottom:6px">📊 File Bán Hàng POS (items_report)</div>
+      <div style="font-size:11px;color:#718096;margin-bottom:4px">Upload hàng tháng — tự cập nhật theo tháng</div>
+      <div id="nvlSalesStatus" style="font-size:12px;color:#888;margin-bottom:12px;min-height:32px">Chưa có dữ liệu</div>
+      <label style="display:inline-block;cursor:pointer;background:#38a169;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">
+        📁 Chọn file Excel
+        <input type="file" accept=".xlsx,.xls" style="display:none" onchange="nvlUploadSales(this)">
+      </label>
+    </div>
+  </div>
+
+  <!-- Filter bar -->
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px;background:#f8fafc;padding:12px 16px;border-radius:10px;border:1px solid #e2e8f0">
+    <select id="nvlSelStore" style="border:1px solid #e2e8f0;padding:7px 12px;border-radius:6px;font-size:13px;min-width:200px" onchange="nvlRenderAnalysis()">
+      <option value="">-- Chọn cửa hàng --</option>
+    </select>
+    <select id="nvlSelMonth" style="border:1px solid #e2e8f0;padding:7px 12px;border-radius:6px;font-size:13px" onchange="nvlRenderAnalysis()">
+      <option value="">-- Chọn tháng --</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555;cursor:pointer">
+      <input type="checkbox" id="nvlChkPkg" checked onchange="nvlRenderAnalysis()"> Ẩn bao bì
+    </label>
+    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555;cursor:pointer">
+      <input type="checkbox" id="nvlChkWater" checked onchange="nvlRenderAnalysis()"> Ẩn nước/đá
+    </label>
+  </div>
+
+  <!-- Results area -->
+  <div id="nvlResults">
+    <div style="text-align:center;padding:50px;color:#aaa;font-size:14px">Upload file công thức và file bán hàng để bắt đầu phân tích</div>
+  </div>
 </div>
 
 <!-- ===== PAGE KẾ HOẠCH SẢN LƯỢNG ===== -->
@@ -3394,6 +3443,7 @@ function showTab(name,el){
     renderSavedPlanList();
   }
   if(name==='inv') initInvTab();
+  if(name==='nvlctrl') initNVLCtrlTab();
 }
 
 var _activeCmpSub='cmp';
@@ -5035,6 +5085,421 @@ function renderSavedPlanList(){
 // ===== KHỞI TẠO RENDER =====
 applyF();
 fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFilter();initYoYFilters();});
+
+// ===== KIỂM SOÁT NVL =====
+const NVL_RECIPE_KEY='phuctea_nvlrcp_v1';
+const NVL_SALES_KEY='phuctea_nvlsales_v1';
+// NVL codes to exclude when "Ẩn nước/đá" is checked
+const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
+
+function nvlLoadRecipe(){try{const d=localStorage.getItem(NVL_RECIPE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
+function nvlLoadSales(){try{const d=localStorage.getItem(NVL_SALES_KEY);return d?JSON.parse(d):[];}catch{return[];}}
+
+// Normalize product name → "base_name|SIZE"
+// Handles both recipe format ("Trà Sữa Phúc - Size S") and POS format ("Trà Sữa Phúc (Size S) / 福...")
+function nvlNormKey(name){
+  if(!name) return '|';
+  let s=String(name)
+    .replace(/\/[^/]*$/,'')          // strip "/ Chinese text..."
+    .replace(/[一-鿿（）]/g,'') // strip Chinese characters
+    .trim();
+  let size='';
+  const sp=[
+    [/[\s(\-]+size\s+1\s*lít\s*[\)]*$/i,'E'],[/[\s(\-]+xô\s+1\s*l\s*[\)]*$/i,'E'],
+    [/[\s(\-]+xô\s*[\)]*$/i,'E'],[/\s+xô\s+1\s*lít$/i,'E'],
+    [/[\s(\-]+size\s+xs\s*[\)]*$/i,'XS'],[/[\s(\-]+bình\s+400\s*ml\s*[\)]*$/i,'B'],
+    [/[\s(\-]+size\s+l\s*[\)]*$/i,'L'],[/[\s(\-]+size\s+m\s*[\)]*$/i,'M'],
+    [/[\s(\-]+size\s+s\s*[\)]*$/i,'S'],
+  ];
+  for(const [re,sz] of sp){if(re.test(s)){size=sz;s=s.replace(re,'');break;}}
+  return s.replace(/[()[\]\-]/g,' ').replace(/\s+/g,' ').trim().toLowerCase()+'|'+size;
+}
+
+// Parse and store recipe Excel
+async function nvlUploadRecipe(input){
+  const file=input.files[0]; if(!file) return;
+  const el=document.getElementById('nvlRecipeStatus');
+  el.innerHTML='⏳ Đang xử lý công thức...';
+  try{
+    const ab=await file.arrayBuffer();
+    const wb=XLSX.read(ab,{type:'array'});
+
+    // Sheet 1: NVL list → nvlMap {code→{name,unit}}
+    const nvlMap={};
+    const s1=wb.Sheets['1. Danh sách NVL'];
+    if(s1){
+      XLSX.utils.sheet_to_json(s1,{header:1,defval:null}).slice(1).forEach(r=>{
+        if(!r[0]||!r[1]) return;
+        nvlMap[String(r[0]).trim()]={name:String(r[1]).trim(),unit:r[6]?String(r[6]).trim():''};
+      });
+    }
+
+    // Sheet 2: BTP list → btpMeta {code→{name,batchSize,unit}}
+    const btpMeta={};
+    const s2=wb.Sheets['2. Danh sách BTP'];
+    if(s2){
+      XLSX.utils.sheet_to_json(s2,{header:1,defval:null}).slice(1).forEach(r=>{
+        if(!r[0]||!r[1]) return;
+        btpMeta[String(r[0]).trim()]={name:String(r[1]).trim(),batchSize:parseFloat(r[3])||1,unit:r[5]?String(r[5]).trim():'ml'};
+      });
+    }
+
+    // Sheet 3: BTP recipes → btpRecipes {btpCode→[{nvlCode,qty,nhom}]}
+    const btpRecipes={};
+    const s3=wb.Sheets['3. Định lượng BTP'];
+    if(s3){
+      XLSX.utils.sheet_to_json(s3,{header:1,defval:null}).slice(2).forEach(r=>{
+        if(!r[0]||!r[5]) return;
+        const btpCode=String(r[0]).trim();
+        const nvlCode=String(r[5]).trim();
+        const qty=parseFloat(r[8])||0; if(qty<=0) return;
+        if(!btpRecipes[btpCode]) btpRecipes[btpCode]=[];
+        btpRecipes[btpCode].push({nvlCode,qty,nhom:r[4]?String(r[4]).trim():''});
+      });
+    }
+
+    // Sheet 4: Product recipes → productMap {normKey→{code,name,ings:[{code,isBTP,qty,unit,nhom,name}]}}
+    const productMap={};
+    const s4=wb.Sheets['4. Định lượng sản phẩm'];
+    if(s4){
+      XLSX.utils.sheet_to_json(s4,{header:1,defval:null}).slice(2).forEach(r=>{
+        if(!r[0]||!r[1]) return;
+        const code=String(r[0]).trim(), name=String(r[1]).trim();
+        const nhom=r[4]?String(r[4]).trim():'';
+        const ingCode=r[5]?String(r[5]).trim():''; if(!ingCode) return;
+        const ingName=r[6]?String(r[6]).trim():'';
+        const ingUnit=r[7]?String(r[7]).trim():'';
+        // Use CT MỚI (col 12) if defined, else Định lượng (col 8)
+        const qty=(r[12]!=null&&r[12]!=='')? parseFloat(r[12]):parseFloat(r[8]);
+        if(isNaN(qty)||qty<=0) return;
+        const key=nvlNormKey(name);
+        if(!productMap[key]) productMap[key]={code,name,key,ings:[]};
+        productMap[key].ings.push({code:ingCode,name:ingName,isBTP:nhom==='BTP',qty,unit:ingUnit,nhom});
+      });
+    }
+
+    const data={nvlMap,btpMeta,btpRecipes,productMap,loadedAt:new Date().toISOString(),fileName:file.name};
+    localStorage.setItem(NVL_RECIPE_KEY,JSON.stringify(data));
+    const nP=Object.keys(productMap).length,nB=Object.keys(btpRecipes).length,nN=Object.keys(nvlMap).length;
+    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm</span><br><span style="color:#888;font-size:11px">${file.name}</span>`;
+  }catch(e){
+    el.innerHTML=`<span style="color:#c53030">❌ Lỗi: ${e.message}</span>`;
+    console.error('nvlUploadRecipe',e);
+  }
+}
+
+// Parse and store sales Excel (items_report format)
+async function nvlUploadSales(input){
+  const file=input.files[0]; if(!file) return;
+  const el=document.getElementById('nvlSalesStatus');
+  el.innerHTML='⏳ Đang xử lý dữ liệu bán hàng...';
+  try{
+    const ab=await file.arrayBuffer();
+    const wb=XLSX.read(ab,{type:'array'});
+    const SKIP=new Set(['Tất cả cửa hàng','Tổng hợp']);
+    const existing=nvlLoadSales();
+    let added=0;
+
+    for(const sn of wb.SheetNames){
+      if(SKIP.has(sn)) continue;
+      const ws=wb.Sheets[sn]; if(!ws) continue;
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+      if(!rows.length) continue;
+
+      // Extract store name: last segment after " - "
+      const parts=sn.split(' - ');
+      const storeName=parts.slice(-1)[0].trim();
+      const storeCode=sn.match(/PHUCTEA\w+/)?.[0]||storeName;
+
+      // Month/year from row 0
+      const hdr=String(rows[0]?.[0]||'');
+      const dm=hdr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+      if(!dm) continue;
+      const month=parseInt(dm[2]),year=parseInt(dm[3]);
+
+      const items=[];
+      for(let i=3;i<rows.length;i++){
+        const r=rows[i];
+        if(!r||!r[1]||!r[4]) continue;
+        if(String(r[4]).trim()!=='Đồ uống') continue;
+        const qty=parseInt(r[5])||0; if(qty<=0) continue;
+        items.push({n:String(r[1]).trim(),q:qty});
+      }
+      if(!items.length) continue;
+
+      const idx=existing.findIndex(d=>d.st===storeCode&&d.m===month&&d.y===year);
+      const entry={st:storeCode,sn:storeName,m:month,y:year,items};
+      if(idx>=0) existing[idx]=entry; else existing.push(entry);
+      added++;
+    }
+
+    localStorage.setItem(NVL_SALES_KEY,JSON.stringify(existing));
+    nvlUpdateDropdowns();
+    const months=[...new Set(existing.map(d=>`T${d.m}/${d.y}`))].sort().join(', ');
+    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${added} cửa hàng — ${existing.length} bản ghi</span><br><span style="color:#888;font-size:11px">${file.name}</span>`;
+  }catch(e){
+    el.innerHTML=`<span style="color:#c53030">❌ Lỗi: ${e.message}</span>`;
+    console.error('nvlUploadSales',e);
+  }
+}
+
+// Refresh store + month dropdowns from saved sales data
+function nvlUpdateDropdowns(){
+  const sales=nvlLoadSales();
+  const stores=new Map(); // storeCode→storeName
+  const months=new Set();
+  sales.forEach(d=>{stores.set(d.st,d.sn||d.st);months.add(`${d.y}-${String(d.m).padStart(2,'0')}`);});
+
+  const stSel=document.getElementById('nvlSelStore');
+  const mSel=document.getElementById('nvlSelMonth');
+  if(!stSel||!mSel) return;
+  const curSt=stSel.value,curM=mSel.value;
+
+  stSel.innerHTML='<option value="">-- Chọn cửa hàng --</option>';
+  [...stores.entries()].sort((a,b)=>a[1].localeCompare(b[1],'vi')).forEach(([code,name])=>{
+    const o=document.createElement('option');
+    o.value=code;o.textContent=name;
+    if(code===curSt) o.selected=true;
+    stSel.appendChild(o);
+  });
+
+  mSel.innerHTML='<option value="">-- Chọn tháng --</option>';
+  [...months].sort().reverse().forEach(ym=>{
+    const[y,m]=ym.split('-');
+    const o=document.createElement('option');
+    o.value=ym;o.textContent=`Tháng ${parseInt(m)}/${y}`;
+    if(ym===curM) o.selected=true;
+    mSel.appendChild(o);
+  });
+}
+
+// Expand BTP code → {nvlCode→qty} given btpQtyNeeded units of BTP
+function nvlExpandBTP(btpCode,btpQtyNeeded,recipe,excludeWater,depth){
+  if((depth||0)>5) return {};
+  const{btpMeta,btpRecipes}=recipe;
+  const result={};
+  const batchSize=btpMeta[btpCode]?.batchSize||1;
+  const ings=btpRecipes[btpCode]||[];
+  for(const{nvlCode,qty:qPerBatch,nhom} of ings){
+    if(nhom==='BTP'){
+      // Nested BTP (rare)
+      const sub=nvlExpandBTP(nvlCode,(btpQtyNeeded/batchSize)*qPerBatch,recipe,excludeWater,(depth||0)+1);
+      Object.entries(sub).forEach(([c,q])=>{result[c]=(result[c]||0)+q;});
+    } else {
+      if(excludeWater&&NVL_WATER_CODES.has(nvlCode)) continue;
+      result[nvlCode]=(result[nvlCode]||0)+(btpQtyNeeded/batchSize)*qPerBatch;
+    }
+  }
+  return result;
+}
+
+// Compute theoretical NVL consumption from sales items
+function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
+  const{nvlMap,productMap}=recipe;
+  const result={};  // nvlCode→{name,unit,qty}
+  const unmatched=[];
+
+  for(const{n:productName,q:qty} of salesItems){
+    const key=nvlNormKey(productName);
+    const prod=productMap[key];
+    if(!prod){unmatched.push({productName,qty});continue;}
+
+    for(const ing of prod.ings){
+      if(ing.isBTP){
+        // Expand BTP → NVL
+        const expanded=nvlExpandBTP(ing.code,ing.qty*qty,recipe,excludeWater,0);
+        Object.entries(expanded).forEach(([nvlCode,nvlQty])=>{
+          const nvl=nvlMap[nvlCode];
+          if(!result[nvlCode]) result[nvlCode]={name:nvl?.name||nvlCode,unit:nvl?.unit||'',qty:0};
+          result[nvlCode].qty+=nvlQty;
+        });
+      } else {
+        if(excludeWater&&NVL_WATER_CODES.has(ing.code)) continue;
+        if(excludePkg&&(ing.nhom==='Bao bì'||ing.nhom==='Bao Bì')) continue;
+        const nvl=nvlMap[ing.code];
+        if(!result[ing.code]) result[ing.code]={name:ing.name||(nvl?.name||ing.code),unit:ing.unit||(nvl?.unit||''),qty:0};
+        result[ing.code].qty+=ing.qty*qty;
+      }
+    }
+  }
+  return{result,unmatched};
+}
+
+// Get actual NVL purchases from D_ALL for store+month+year
+function nvlGetActual(storeCode,storeName,month,year){
+  const NVL_LOAI=['NL ĐỘC QUYỀN','VL ĐỘC QUYỀN'];
+  const actual={};
+  D_ALL.filter(r=>{
+    if(r.thang!=month||r.nam!=year) return false;
+    if(!NVL_LOAI.includes(r.loaiHang)) return false;
+    const cn=(r.chiNhanh||'').toUpperCase();
+    // Match by PHUCTEAXXX code or store name (first 6 chars)
+    return cn.includes(storeCode.toUpperCase())||
+           (storeName&&cn.includes(storeName.toUpperCase().slice(0,6)));
+  }).forEach(r=>{
+    const nm=(r.sanPham||'').trim(); if(!nm) return;
+    actual[nm.toLowerCase()]=(actual[nm.toLowerCase()]||0)+(r.sl||0);
+    actual['__raw__']=actual['__raw__']||{};
+    actual['__raw__'][nm]=(actual['__raw__'][nm]||0)+(r.sl||0);
+  });
+  return actual;
+}
+
+// Render the NVL analysis
+function nvlRenderAnalysis(){
+  const recipe=nvlLoadRecipe();
+  const sales=nvlLoadSales();
+  const res=document.getElementById('nvlResults'); if(!res) return;
+
+  if(!recipe){
+    res.innerHTML='<div style="text-align:center;padding:50px;color:#888;font-size:14px">⬆️ Upload file công thức trước</div>';
+    return;
+  }
+  if(!sales.length){
+    res.innerHTML='<div style="text-align:center;padding:50px;color:#888;font-size:14px">⬆️ Upload file bán hàng (items_report) trước</div>';
+    return;
+  }
+
+  const storeCode=document.getElementById('nvlSelStore')?.value||'';
+  const ym=document.getElementById('nvlSelMonth')?.value||'';
+  const excludePkg=document.getElementById('nvlChkPkg')?.checked!==false;
+  const excludeWater=document.getElementById('nvlChkWater')?.checked!==false;
+
+  if(!storeCode||!ym){
+    res.innerHTML='<div style="text-align:center;padding:40px;color:#aaa">Chọn cửa hàng và tháng để xem phân tích</div>';
+    return;
+  }
+
+  const[y,m]=[parseInt(ym.split('-')[0]),parseInt(ym.split('-')[1])];
+  const entry=sales.find(d=>d.st===storeCode&&d.m===m&&d.y===y);
+  if(!entry||!entry.items?.length){
+    res.innerHTML=`<div style="text-align:center;padding:40px;color:#aaa">Không có dữ liệu bán hàng cho cửa hàng này trong T${m}/${y}</div>`;
+    return;
+  }
+
+  const{result:theoretical,unmatched}=nvlCalcTheoretical(entry.items,recipe,excludePkg,excludeWater);
+  const actual=nvlGetActual(storeCode,entry.sn||'',m,y);
+  const rawActual=actual['__raw__']||{};
+
+  const rows=Object.entries(theoretical)
+    .filter(([,v])=>v.qty>=0.5)
+    .sort((a,b)=>b[1].qty-a[1].qty);
+
+  const totalItems=entry.items.reduce((s,i)=>s+i.q,0);
+  const matchedCount=entry.items.length-unmatched.length;
+  const hasActual=Object.keys(rawActual).length>0;
+
+  // Summary chips
+  let html=`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px">
+    <div style="background:#ebf8ff;color:#2b6cb0;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🏪 ${entry.sn||storeCode}</div>
+    <div style="background:#e8f5ee;color:#1a6b3c;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🥤 ${totalItems.toLocaleString('vi-VN')} ly bán</div>
+    <div style="background:#fff8e6;color:#7a5800;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">📋 ${matchedCount}/${entry.items.length} món có công thức</div>
+    <div style="background:#f8fafc;color:#555;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🧪 ${rows.length} NVL theo dõi</div>
+    ${!hasActual?'<div style="background:#fff5f5;color:#c53030;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700">⚠️ Không tìm thấy dữ liệu nhập hàng HT cho cửa hàng này</div>':''}
+  </div>`;
+
+  // Comparison table
+  html+=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+  <thead><tr style="background:#2d3748;color:#fff;text-align:left">
+    <th style="padding:10px 12px;border-radius:8px 0 0 0">Nguyên vật liệu</th>
+    <th style="padding:10px 12px;text-align:center">ĐVT</th>
+    <th style="padding:10px 12px;text-align:right">Lý thuyết cần</th>
+    <th style="padding:10px 12px;text-align:right">Thực tế nhập (HT)</th>
+    <th style="padding:10px 12px;text-align:right">Chênh lệch</th>
+    <th style="padding:10px 12px;text-align:center;border-radius:0 8px 0 0">Trạng thái</th>
+  </tr></thead><tbody>`;
+
+  let cntRed=0,cntYellow=0,cntOk=0;
+  rows.forEach(([nvlCode,{name,unit,qty:thQty}])=>{
+    // Find actual qty by matching name (case-insensitive)
+    const actKey=name.toLowerCase().trim();
+    const actQty=actual[actKey]||0;
+    const diff=actQty-thQty;
+    const pct=thQty>0?(diff/thQty*100):0;
+
+    let badge,rowBg='';
+    if(!hasActual||actQty===0){
+      badge='<span style="background:#edf2f7;color:#718096;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">— Chưa có data HT</span>';
+    } else if(pct<-20){
+      cntRed++;
+      badge=`<span style="background:#fed7d7;color:#c53030;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🔴 Thiếu ${Math.abs(pct).toFixed(0)}%</span>`;
+      rowBg='background:#fff5f5';
+    } else if(pct<-5){
+      cntYellow++;
+      badge=`<span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🟡 Thiếu ${Math.abs(pct).toFixed(0)}%</span>`;
+      rowBg='background:#fffbeb';
+    } else if(pct>50){
+      badge=`<span style="background:#ebf8ff;color:#2b6cb0;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">🔵 Dư ${pct.toFixed(0)}%</span>`;
+    } else {
+      cntOk++;
+      badge='<span style="background:#e8f5ee;color:#1a6b3c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">✅ Bình thường</span>';
+    }
+
+    html+=`<tr style="${rowBg};border-bottom:1px solid #edf2f7">
+      <td style="padding:9px 12px;font-weight:600">${name}</td>
+      <td style="padding:9px 12px;text-align:center;color:#718096">${unit}</td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700">${thQty.toFixed(1)}</td>
+      <td style="padding:9px 12px;text-align:right;color:#2b6cb0;font-weight:700">${actQty>0?actQty.toFixed(1):'–'}</td>
+      <td style="padding:9px 12px;text-align:right;font-weight:700;color:${diff<-0.1?'#c53030':diff>0.1?'#2b6cb0':'#555'}">
+        ${actQty>0?(diff>=0?'+':'')+diff.toFixed(1):'–'}
+      </td>
+      <td style="padding:9px 12px;text-align:center">${badge}</td>
+    </tr>`;
+  });
+
+  html+=`</tbody></table></div>`;
+
+  // Risk summary
+  if(hasActual&&(cntRed+cntYellow)>0){
+    html+=`<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      ${cntRed?`<div style="background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;color:#c53030">🔴 ${cntRed} NVL thiếu >20% — Nguy cơ cao mua ngoài</div>`:''}
+      ${cntYellow?`<div style="background:#fffbeb;border:1px solid #fbd38d;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;color:#92400e">🟡 ${cntYellow} NVL thiếu 5–20%</div>`:''}
+      ${cntOk?`<div style="background:#e8f5ee;border:1px solid #9ae6b4;border-radius:8px;padding:10px 16px;font-size:13px;font-weight:700;color:#1a6b3c">✅ ${cntOk} NVL bình thường</div>`:''}
+    </div>`;
+  }
+
+  // Unmatched products
+  if(unmatched.length>0){
+    html+=`<div style="margin-top:14px;background:#fffbeb;border:1px solid #f6ad55;border-radius:10px;padding:14px">
+      <div style="font-weight:700;font-size:13px;color:#7a5800;margin-bottom:8px">⚠️ ${unmatched.length} sản phẩm chưa có công thức (không tính vào lý thuyết)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${unmatched.slice(0,30).map(u=>`<span style="background:#fff;border:1px solid #f6ad55;padding:3px 8px;border-radius:4px;font-size:11px;color:#7a5800">${u.productName} ×${u.qty}</span>`).join('')}
+        ${unmatched.length>30?`<span style="color:#7a5800;font-size:11px;padding:3px 8px">+${unmatched.length-30} món nữa</span>`:''}
+      </div>
+    </div>`;
+  }
+
+  // Actual items not in theoretical (extra purchases)
+  const extraActual=Object.entries(rawActual).filter(([nm])=>!rows.some(([,v])=>v.name.toLowerCase()===nm.toLowerCase()));
+  if(extraActual.length>0){
+    html+=`<div style="margin-top:14px;background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:14px">
+      <div style="font-weight:700;font-size:13px;color:#2b6cb0;margin-bottom:8px">📦 ${extraActual.length} NVL nhập thêm không có trong công thức</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${extraActual.map(([nm,q])=>`<span style="background:#fff;border:1px solid #bee3f8;padding:3px 8px;border-radius:4px;font-size:11px;color:#2b6cb0">${nm} (${q})</span>`).join('')}
+      </div>
+    </div>`;
+  }
+
+  res.innerHTML=html;
+}
+
+// Init tab
+function initNVLCtrlTab(){
+  const recipe=nvlLoadRecipe();
+  const sales=nvlLoadSales();
+  const rEl=document.getElementById('nvlRecipeStatus');
+  if(rEl&&recipe){
+    const nP=Object.keys(recipe.productMap||{}).length;
+    const nB=Object.keys(recipe.btpRecipes||{}).length;
+    const nN=Object.keys(recipe.nvlMap||{}).length;
+    rEl.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm</span><br><span style="color:#888;font-size:11px">${recipe.fileName||''}</span>`;
+  }
+  const sEl=document.getElementById('nvlSalesStatus');
+  if(sEl&&sales.length){
+    sEl.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${sales.length} bản ghi cửa hàng × tháng</span>`;
+  }
+  nvlUpdateDropdowns();
+}
 </script>
 </body>
 </html>
