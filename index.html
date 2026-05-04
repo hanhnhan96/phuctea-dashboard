@@ -2819,12 +2819,20 @@ function renderOrderTrack(){
     if(r.ngayGuiHang){o.countGui++;if(!o.ngayGui)o.ngayGui=r.ngayGuiHang.slice(0,10);}
   });
   // Tính trạng thái từng đơn
+  const curM=today.getMonth()+1, curY=today.getFullYear();
   const orders=Object.values(map).map(o=>{
     const d=new Date(o.ngay);d.setHours(0,0,0,0);
     o.daysWait=countWorkdays(d,today);
     if(o.countGui>0&&o.countGui===o.soSP) o.code='sent';
     else if(o.countGui>0) o.code='partial';
     else o.code=o.daysWait>=7?'urgent':o.daysWait>=5?'warn':'ok';
+    // Đơn ok (< 5 ngày, chưa giao) qua tháng mới → tính KPI tháng mới
+    // Ngoại lệ: partial giữ tháng gốc
+    const ordM=d.getMonth()+1, ordY=d.getFullYear();
+    const isPrevMonth=(ordY<curY)||(ordY===curY&&ordM<curM);
+    o._kpiMonth = (o.code==='ok'&&isPrevMonth) ? curM : ordM;
+    o._kpiYear  = (o.code==='ok'&&isPrevMonth) ? curY  : ordY;
+    o._movedMonth = o.code==='ok'&&isPrevMonth; // hiển thị badge
     return o;
   });
   // Summary chips
@@ -2837,6 +2845,8 @@ function renderOrderTrack(){
   if(cnt.ok)ha+=chip(`🟢 ${cnt.ok} đơn đang xử lý`,'#e8f5ee','#1a6b3c')+' ';
   if(cnt.partial)ha+=chip(`🔶 ${cnt.partial} đơn giao 1 phần`,'#fff3e0','#b45309')+' ';
   if(cnt.sent)ha+=chip(`✅ ${cnt.sent} đơn đã gửi`,'#ebf8ff','#2b6cb0');
+  const nMoved=orders.filter(o=>o._movedMonth).length;
+  if(nMoved) ha+=' '+chip(`↩ ${nMoved} đơn chuyển → T${curM}`,'#e8f0ff','#3455db');
   const alEl=document.getElementById('ordAlerts');
   if(alEl) alEl.innerHTML=ha||'<span style="color:#aaa;font-size:12px">Không có dữ liệu trong khoảng đã chọn</span>';
   // Lọc
@@ -2867,7 +2877,10 @@ function renderOrderTrack(){
         <td><span style="background:${tl.bg};color:${tl.cl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${tl.label}</span></td>
         <td style="text-align:center">${o.ngay}</td>
         <td style="text-align:center">${o.ngayGui||'<span style="color:#bbb">–</span>'}</td>
-        <td style="text-align:center;font-weight:700;color:${o.code==='urgent'?'#c53030':o.code==='warn'?'#7a5800':o.code==='sent'?'#2b6cb0':o.code==='partial'?'#b45309':'#1a6b3c'}">${o.code==='sent'?'–':o.daysWait+' ngày'}</td>
+        <td style="text-align:center;font-weight:700;color:${o.code==='urgent'?'#c53030':o.code==='warn'?'#7a5800':o.code==='sent'?'#2b6cb0':o.code==='partial'?'#b45309':'#1a6b3c'}">
+          ${o.code==='sent'?'–':o.daysWait+' ngày'}
+          ${o._movedMonth?`<div style="font-size:9px;font-weight:700;color:#3455db;background:#e8f0ff;padding:1px 5px;border-radius:3px;margin-top:2px">↩ KPI T${curM}</div>`:''}
+        </td>
         <td style="text-align:right;font-weight:700">${fmtB(o.tongDT)}</td>
         <td style="text-align:center">${o.code==='partial'?`<span style="color:#b45309;font-weight:700">${o.countGui}/${o.soSP} SP</span>`:o.soSP}</td>
         <td>${slBadge[o.code]||''}</td>
@@ -2877,79 +2890,108 @@ function renderOrderTrack(){
   document.getElementById('ordTbody').innerHTML=tb;
 
   // ===== BẢNG KPI ĐÁNH GIÁ =====
-  // Mỗi đơn: đúng hạn nếu (ngayGui - ngay) <= 8 ngày, hoặc chưa gửi mà daysWait <= 8 (còn trong hạn)
   const KPI_DAY=7;
   const kpiRows=typeF?orders.filter(o=>o.ordType===typeF):orders;
-  // Thống kê theo loại đơn
-  const kpiStat={
-    nl:{label:'Nguyên liệu & NL ĐQ',bg:'#e8f5ee',cl:'#1a6b3c',total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0},
-    vl:{label:'Vật liệu & VL ĐQ',   bg:'#fff8e6',cl:'#7a5800',total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0},
-    ht:{label:'Hệ Thống',            bg:'#ebf8ff',cl:'#2b6cb0',total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0}
-  };
-  kpiRows.forEach(o=>{
-    const s=kpiStat[o.ordType]||kpiStat.ht;
-    s.total++;
-    if(o.code==='sent'){
-      // Đã gửi đủ — tính số ngày từ ngày đặt → ngày gửi
-      const d1=new Date(o.ngay),d2=new Date(o.ngayGui);
-      const gap=countWorkdays(d1,d2);
-      if(gap<=KPI_DAY) s.duiHan++; else s.treHan++;
-    } else {
-      // Chưa gửi hoặc giao 1 phần → chưa hoàn thành
-      if(o.daysWait>KPI_DAY) s.chuaGiaoQuaHan++; else s.chuaGiao++;
-    }
+
+  // Helper tính stat 1 nhóm đơn
+  function calcStat(rows){
+    const s={total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0};
+    rows.forEach(o=>{
+      s.total++;
+      if(o.code==='sent'){
+        const gap=countWorkdays(new Date(o.ngay),new Date(o.ngayGui));
+        if(gap<=KPI_DAY) s.duiHan++; else s.treHan++;
+      } else if(o.code==='partial'){
+        // Giao 1 phần → phần đã giao đúng hạn/trễ; phần chưa giao tính riêng
+        const gap=countWorkdays(new Date(o.ngay),new Date(o.ngayGui));
+        if(gap<=KPI_DAY) s.duiHan++; else s.treHan++;
+        // Phần chưa giao (tính như đơn mới từ ngayGui)
+        const pendDays=countWorkdays(new Date(o.ngayGui),today);
+        if(pendDays>KPI_DAY) s.chuaGiaoQuaHan++; else s.chuaGiao++;
+        s.total++; // thêm 1 "đơn" cho phần chưa giao
+      } else {
+        if(o.daysWait>KPI_DAY) s.chuaGiaoQuaHan++; else s.chuaGiao++;
+      }
+    });
+    return s;
+  }
+
+  // Thống kê theo tháng KPI (đơn ok tháng trước → curM)
+  const monthSet=[...new Set(kpiRows.map(o=>`${o._kpiYear}-${String(o._kpiMonth).padStart(2,'0')}`))].sort();
+  const monthStat={};
+  monthSet.forEach(mk=>{
+    const [y,m]=mk.split('-').map(Number);
+    monthStat[mk]={
+      label:`T${m}/${y}`, isCur:(m===curM&&y===curY),
+      movedIn:kpiRows.filter(o=>o._movedMonth&&o._kpiMonth===m&&o._kpiYear===y).length,
+      ...calcStat(kpiRows.filter(o=>o._kpiMonth===m&&o._kpiYear===y))
+    };
   });
-  // Tổng hợp
-  const tot={total:0,duiHan:0,treHan:0,chuaGiao:0,chuaGiaoQuaHan:0};
-  Object.values(kpiStat).forEach(s=>{tot.total+=s.total;tot.duiHan+=s.duiHan;tot.treHan+=s.treHan;tot.chuaGiao+=s.chuaGiao;tot.chuaGiaoQuaHan+=s.chuaGiaoQuaHan;});
-  // % đạt = đúng hạn / (đúng hạn + trễ hạn + chưa giao quá hạn) — chưa giao còn trong hạn không tính
+  // Tổng
+  const tot=calcStat(kpiRows);
   const denomAll=tot.duiHan+tot.treHan+tot.chuaGiaoQuaHan;
   const pctAll=denomAll>0?Math.round(tot.duiHan/denomAll*100):100;
+
   const scoreEl=document.getElementById('ordKpiScore');
   if(scoreEl){
     const cl=pctAll>=100?'#1a6b3c':pctAll>=80?'#f0a500':'#c53030';
     scoreEl.innerHTML=`<span style="color:${cl}">${pctAll}%</span> <span style="font-size:12px;color:#aaa;font-weight:400">vs KH 100%</span>`;
   }
-  function kpiRow(lbl,bg,cl,s){
+
+  function kpiRow(lbl,s,extra){
     const denom=s.duiHan+s.treHan+s.chuaGiaoQuaHan;
     const p=denom>0?Math.round(s.duiHan/denom*100):100;
-    const bar=`<div style="background:#f0f0f0;border-radius:4px;height:6px;margin-top:4px"><div style="background:${p>=100?'#1a6b3c':p>=80?'#f0a500':'#c53030'};width:${Math.min(100,p)}%;height:6px;border-radius:4px"></div></div>`;
+    const cl=p>=100?'#1a6b3c':p>=80?'#f0a500':'#c53030';
+    const bar=`<div style="background:#f0f0f0;border-radius:4px;height:5px;margin-top:3px"><div style="background:${cl};width:${Math.min(100,p)}%;height:5px;border-radius:4px"></div></div>`;
     return`<tr>
-      <td><span style="background:${bg};color:${cl};padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">${lbl}</span></td>
-      <td style="text-align:center">${s.total}</td>
-      <td style="text-align:center;color:#1a6b3c;font-weight:700">${s.duiHan}</td>
-      <td style="text-align:center;color:#c53030;font-weight:700">${s.treHan}</td>
-      <td style="text-align:center;color:#888">${s.chuaGiao}</td>
-      <td style="text-align:center;color:#c53030">${s.chuaGiaoQuaHan}</td>
-      <td style="min-width:100px"><div style="font-weight:800;color:${p>=100?'#1a6b3c':p>=80?'#f0a500':'#c53030'}">${denom?p+'%':'–'}</div>${bar}</td>
+      <td style="padding:7px 10px">${lbl}${extra||''}</td>
+      <td style="padding:7px 10px;text-align:center">${s.total}</td>
+      <td style="padding:7px 10px;text-align:center;color:#1a6b3c;font-weight:700">${s.duiHan}</td>
+      <td style="padding:7px 10px;text-align:center;color:#c53030;font-weight:700">${s.treHan}</td>
+      <td style="padding:7px 10px;text-align:center;color:#888">${s.chuaGiao}</td>
+      <td style="padding:7px 10px;text-align:center;color:#c53030">${s.chuaGiaoQuaHan}</td>
+      <td style="padding:7px 10px;min-width:90px"><div style="font-weight:800;color:${cl}">${denom?p+'%':'–'}</div>${bar}</td>
     </tr>`;
   }
+
   const kpiTbl=document.getElementById('ordKpiTable');
   if(kpiTbl){
     let kh=`<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px">
       <thead><tr style="background:#f8fafc">
-        <th style="padding:8px 10px;text-align:left;font-weight:700">Loại đơn</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700">Tổng đơn</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#1a6b3c">✅ Đúng hạn (≤${KPI_DAY}N)</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#c53030">❌ Trễ hạn</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#888">⏳ Chưa giao (còn hạn)</th>
-        <th style="padding:8px 10px;text-align:center;font-weight:700;color:#c53030">⚠️ Chưa giao (quá hạn)</th>
-        <th style="padding:8px 10px;text-align:left;font-weight:700">% Đạt KPI</th>
+        <th style="padding:8px 10px;text-align:left">Tháng KPI</th>
+        <th style="padding:8px 10px;text-align:center">Tổng đơn</th>
+        <th style="padding:8px 10px;text-align:center;color:#1a6b3c">✅ Đúng hạn (≤${KPI_DAY}N)</th>
+        <th style="padding:8px 10px;text-align:center;color:#c53030">❌ Trễ hạn</th>
+        <th style="padding:8px 10px;text-align:center;color:#888">⏳ Chưa giao (còn hạn)</th>
+        <th style="padding:8px 10px;text-align:center;color:#b45309">⚠️ Chưa giao (quá hạn)</th>
+        <th style="padding:8px 10px;text-align:left">% Đạt KPI</th>
       </tr></thead><tbody>`;
-    ['nl','vl','ht'].forEach(t=>{const s=kpiStat[t];kh+=kpiRow(s.label,s.bg,s.cl,s);});
+
+    monthSet.forEach(mk=>{
+      const ms=monthStat[mk];
+      const lbl=`<span style="font-weight:700;${ms.isCur?'color:#3455db':''}">${ms.label}</span>`;
+      const moved=ms.movedIn>0
+        ?`<span style="font-size:9px;background:#e8f0ff;color:#3455db;padding:1px 5px;border-radius:3px;margin-left:5px" title="Gồm ${ms.movedIn} đơn chuyển từ tháng trước">↩ +${ms.movedIn}</span>`
+        :'';
+      kh+=kpiRow(lbl,ms,moved);
+    });
+
     // Dòng tổng
     const dp=denomAll>0?Math.round(tot.duiHan/denomAll*100):100;
-    const barT=`<div style="background:#f0f0f0;border-radius:4px;height:6px;margin-top:4px"><div style="background:${dp>=100?'#1a6b3c':dp>=80?'#f0a500':'#c53030'};width:${Math.min(100,dp)}%;height:6px;border-radius:4px"></div></div>`;
+    const clT=dp>=100?'#1a6b3c':dp>=80?'#f0a500':'#c53030';
+    const barT=`<div style="background:#f0f0f0;border-radius:4px;height:5px;margin-top:3px"><div style="background:${clT};width:${Math.min(100,dp)}%;height:5px;border-radius:4px"></div></div>`;
     kh+=`<tr style="background:#f8fafc;font-weight:700;border-top:2px solid #e2e8f0">
       <td style="padding:8px 10px">Tổng cộng</td>
       <td style="padding:8px 10px;text-align:center">${tot.total}</td>
       <td style="padding:8px 10px;text-align:center;color:#1a6b3c">${tot.duiHan}</td>
       <td style="padding:8px 10px;text-align:center;color:#c53030">${tot.treHan}</td>
       <td style="padding:8px 10px;text-align:center;color:#888">${tot.chuaGiao}</td>
-      <td style="padding:8px 10px;text-align:center;color:#c53030">${tot.chuaGiaoQuaHan}</td>
-      <td style="padding:8px 10px;min-width:100px"><div style="font-size:16px;font-weight:800;color:${dp>=100?'#1a6b3c':dp>=80?'#f0a500':'#c53030'}">${denomAll?dp+'%':'–'}</div>${barT}</td>
+      <td style="padding:8px 10px;text-align:center;color:#b45309">${tot.chuaGiaoQuaHan}</td>
+      <td style="padding:8px 10px;min-width:90px"><div style="font-size:16px;font-weight:800;color:${clT}">${denomAll?dp+'%':'–'}</div>${barT}</td>
     </tr>`;
-    kpiTbl.innerHTML=kh+'</tbody></table>';
+    kh+=`</tbody></table>`;
+    if(nMoved>0) kh+=`<div style="font-size:11px;color:#3455db;margin-top:6px">💡 <b>${nMoved} đơn ok (&lt;5 ngày)</b> từ tháng trước được tính vào KPI tháng hiện tại (↩). Đơn giao 1 phần giữ nguyên tháng gốc.</div>`;
+    kpiTbl.innerHTML=kh;
   }
 
   // ===== PHÂN BỐ THỜI GIAN GIAO HÀNG =====
