@@ -625,7 +625,7 @@ tr:last-child td{border-bottom:none}
 
   <!-- TỶ LỆ DT/HT -->
   <div class="bod-section">
-    <div class="bod-section-title">🏪 Tỷ lệ DT bán hàng / DT Toàn hệ thống <span>Nhập DT hệ thống trong tab KPI Mục tiêu</span></div>
+    <div class="bod-section-title">🏪 Tỷ lệ DT bán hàng / DT Toàn hệ thống <span>DT bán hàng = Phúc Tea, trừ nhóm HỆ THỐNG &amp; VD ĐỘC QUYỀN · DT HT nhập trong tab KPI</span></div>
     <div class="bod-row-header">Thực tế | Mục tiêu | % Đạt</div>
     <div class="bod-grid" id="bodHTGrid"></div>
   </div>
@@ -2449,14 +2449,19 @@ function renderBOD(){
     cellLN('TSLN Năm', rY, tsln_kh_y_v, ln_y, ln_kh_y);
 
   // Tỷ lệ DT/HT cells
-  const tl_d = ht_tt_m&&ht_tt_m>0 ? dt_d*daysInMonth/lastDay/ht_tt_m : null; // ước tính
-  const tl_m = ht_tt_m&&ht_tt_m>0 ? dt_m/ht_tt_m : null;
+  // DT bán hàng = Phúc Tea, trừ nhóm HỆ THỐNG và VD ĐỘC QUYỀN
+  const BH_EXCLUDE=['HỆ THỐNG','VD ĐỘC QUYỀN'];
+  const isBH=r=>r.brand==='PHÚC TEA'&&!BH_EXCLUDE.includes(r.loaiHang);
+  const dtBH_d=sumF(rDay.filter(isBH),'thanhTien');
+  const dtBH_m=sumF(rMon.filter(isBH),'thanhTien');
+  const tl_d = ht_tt_m&&ht_tt_m>0 ? dtBH_d*daysInMonth/lastDay/ht_tt_m : null; // ước tính
+  const tl_m = ht_tt_m&&ht_tt_m>0 ? dtBH_m/ht_tt_m : null;
   const noHT = 'Nhập DT HT trong KPI';
   document.getElementById('bodHTGrid').innerHTML =
     cell('Tỷ lệ Trong ngày', tl_d, tl_kh_m?tl_kh_m/100:null, true, noHT) +
     cell(`Tỷ lệ T${lastMonth}`, tl_m, tl_kh_m?tl_kh_m/100:null, true, noHT) +
     `<div class="bod-cell"><div class="bod-cell-label">DT HT T${lastMonth}</div><div class="bod-cell-val">${ht_tt_m?fmtB(ht_tt_m):'–'}</div><div class="bod-cell-target">Nhập trong tab KPI</div></div>` +
-    `<div class="bod-cell"><div class="bod-cell-label">DT thực tế T${lastMonth}</div><div class="bod-cell-val">${fmtB(dt_m)}</div><div class="bod-cell-target">Từ dữ liệu bán hàng</div></div>`;
+    `<div class="bod-cell"><div class="bod-cell-label">DT bán hàng T${lastMonth}</div><div class="bod-cell-val">${fmtB(dtBH_m)}</div><div class="bod-cell-target">Phúc Tea · trừ HT &amp; VD ĐQ</div></div>`;
 
   // Thu hồi Công nợ
   document.getElementById('bodCNsub').textContent=`Dữ liệu đến ${lastDateStr}`;
