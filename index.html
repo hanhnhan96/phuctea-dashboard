@@ -1853,8 +1853,18 @@ function renderPdPage(){
   }
   const gr={},cgr={};
   filt.forEach(r=>{
-    if(!gr[r.sanPham])gr[r.sanPham]={dt:0,ln:0,sl:0,cat:r.loaiHang};
-    gr[r.sanPham].dt+=(r.thanhTien||0);gr[r.sanPham].ln+=(r.lnThuc||0);gr[r.sanPham].sl+=r.sl;
+    const rawName=r.sanPham||'';
+    const k=normalizeSPName(rawName).toLowerCase();
+    const thisDate=(r.nam||0)*100+(r.thang||0);
+    if(!gr[k]){
+      gr[k]={displayName:rawName,lastDate:thisDate,dt:0,ln:0,sl:0,cat:r.loaiHang||'Khác'};
+    }
+    // Dùng tên từ tháng mới nhất
+    if(thisDate>=gr[k].lastDate){
+      gr[k].displayName=rawName;
+      gr[k].lastDate=thisDate;
+    }
+    gr[k].dt+=(r.thanhTien||0);gr[k].ln+=(r.lnThuc||0);gr[k].sl+=r.sl;
     if(!cgr[r.loaiHang])cgr[r.loaiHang]={dt:0,sl:0,ln:0};
     cgr[r.loaiHang].dt+=(r.thanhTien||0);cgr[r.loaiHang].sl+=r.sl;cgr[r.loaiHang].ln+=(r.lnThuc||0);
   });
@@ -1864,7 +1874,7 @@ function renderPdPage(){
   dc('pd');
   CH['pd']=new Chart(document.getElementById('cProd').getContext('2d'),{
     type:'bar',
-    data:{labels:t15.map(x=>x[0].slice(0,28)),datasets:[{data:t15.map(x=>x[1].dt),backgroundColor:CL.concat(CL),borderRadius:4}]},
+    data:{labels:t15.map(x=>x[1].displayName.slice(0,28)),datasets:[{data:t15.map(x=>x[1].dt),backgroundColor:CL.concat(CL),borderRadius:4}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},datalabels:{anchor:'end',align:'right',formatter:v=>fmtB(v),font:{size:10,weight:'bold'},color:'#333'}},
       scales:{x:{ticks:{callback:v=>fmtB(v)}},y:{ticks:{font:{size:10}}}}}
@@ -1887,7 +1897,7 @@ function renderPdPage(){
     const rc=i===0?'r1':i===1?'r2':i===2?'r3':'rk';
     tb+=`<tr>
       <td><span class="${rc}">#${i+1}</span></td>
-      <td style="font-weight:600">${x[0]}</td>
+      <td style="font-weight:600">${d.displayName}</td>
       <td><span class="tag tag-g">${d.cat}</span></td>
       <td style="font-weight:700">${fmt(d.dt)}</td>
       <td>${fmt(Math.round(d.sl))}</td>
