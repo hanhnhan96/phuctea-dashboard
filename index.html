@@ -2836,16 +2836,43 @@ const ORD_TYPE_LABEL={
   vl:{label:'Vật liệu & VL ĐQ',    bg:'#fff8e6', cl:'#7a5800'},
   ht:{label:'Hệ Thống',             bg:'#ebf8ff', cl:'#2b6cb0'}
 };
+// ===== NGÀY LỄ VIỆT NAM =====
+// Cập nhật mỗi năm: thêm ngày nghỉ bù do Chính phủ quyết định
+const VN_HOLIDAYS=new Set([
+  // 2025
+  '2025-01-01', // Tết Dương Lịch
+  '2025-01-27','2025-01-28','2025-01-29','2025-01-30','2025-01-31',
+  '2025-02-03', // Tết Nguyên Đán Ất Tỵ (27 Tết → mùng 5)
+  '2025-04-07', // Giỗ Tổ Hùng Vương (10/3 Âm lịch)
+  '2025-04-30', // Ngày Giải phóng miền Nam
+  '2025-05-01', // Ngày Quốc tế Lao động
+  '2025-09-01','2025-09-02', // Quốc khánh + nghỉ bù
+  // 2026
+  '2026-01-01', // Tết Dương Lịch
+  '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',
+  '2026-02-23', // Tết Nguyên Đán Bính Ngọ (nghỉ bù)
+  '2026-04-26', // Giỗ Tổ Hùng Vương (10/3 Âm lịch)
+  '2026-04-27', // Nghỉ bù dịp 30/4 – 1/5
+  '2026-04-30', // Ngày Giải phóng miền Nam
+  '2026-05-01', // Ngày Quốc tế Lao động
+  '2026-09-02', // Quốc khánh
+]);
+function isHoliday(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+  return VN_HOLIDAYS.has(`${y}-${m}-${dd}`);
+}
+
 function countWorkdays(d1,d2){
-  // Đếm số ngày làm việc (T2-T6) từ d1 đến d2 (không tính d1, tính d2 nếu là ngày làm việc)
+  // Đếm số ngày làm việc (T2-T6, không kể lễ) từ d1 đến d2
+  // Không tính d1, tính d2 nếu là ngày làm việc
   let count=0;
   const cur=new Date(d1);cur.setHours(0,0,0,0);
   const end=new Date(d2);end.setHours(0,0,0,0);
   if(end<=cur) return 0;
-  cur.setDate(cur.getDate()+1); // bắt đầu từ ngày tiếp theo
+  cur.setDate(cur.getDate()+1);
   while(cur<=end){
-    const dow=cur.getDay(); // 0=CN,6=T7
-    if(dow!==0&&dow!==6) count++;
+    const dow=cur.getDay();
+    if(dow!==0&&dow!==6&&!isHoliday(cur)) count++;
     cur.setDate(cur.getDate()+1);
   }
   return count;
