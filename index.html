@@ -5143,6 +5143,12 @@ const NVL_PROD_ALIAS={
   'trà sữa khoai môn tươi quết': 'sữa khoai môn tươi quết',
 };
 
+// Combo bán lẻ NVL: tên combo POS (lowercase sau normalizeSPName) → { nvlName, qty }
+// Ví dụ: 1 "COMBO SIÊU TIẾT KIỆM (TRÂN CHÂU GIÒN)" = 3 thùng "Trân Châu Giòn Phúc Tea"
+const NVL_COMBO_MAP={
+  'combo siêu tiết kiệm (trân châu giòn)': { nvlName:'trân châu giòn phúc tea', qty:3 },
+};
+
 function nvlLoadRecipe(){try{const d=localStorage.getItem(NVL_RECIPE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
 function nvlLoadSales(){try{const d=localStorage.getItem(NVL_SALES_KEY);return d?JSON.parse(d):[];}catch{return[];}}
 
@@ -5355,14 +5361,33 @@ function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
   const result={};  // nvlCode→{name,unit,qty}
   const unmatched=[];
 
+  // Bảng tra NVL theo tên chuẩn hoá → code (dùng cho combo bán lẻ)
+  const nvlCodeByNorm={};
+  Object.entries(nvlMap).forEach(([code,v])=>{ nvlCodeByNorm[nvlNormNVLName(v.name)]=code; });
+
   for(const{n:productName,q:qty} of salesItems){
     const key=nvlNormKey(productName);
+    const base=key.split('|')[0];
+
+    // --- Combo bán lẻ NVL (ví dụ: COMBO SIÊU TIẾT KIỆM = 3 thùng trân châu giòn) ---
+    const combo=NVL_COMBO_MAP[nvlNormNVLName(productName)];
+    if(combo){
+      const nvlCode=nvlCodeByNorm[nvlNormNVLName(combo.nvlName)];
+      if(nvlCode){
+        const nvl=nvlMap[nvlCode];
+        if(!result[nvlCode]) result[nvlCode]={name:nvl.name,unit:nvl.unit||'',qty:0};
+        result[nvlCode].qty+=combo.qty*qty;
+      } else {
+        unmatched.push({productName,qty,note:'combo NVL not found: '+combo.nvlName});
+      }
+      continue;
+    }
+
     // Tìm trực tiếp, nếu không có thì thử alias
     let prod=productMap[key];
     if(!prod){
-      const[base,size]=key.split('|');
       const ab=NVL_PROD_ALIAS[base];
-      if(ab) prod=productMap[ab+'|'+size];
+      if(ab) prod=productMap[ab+'|'+key.split('|')[1]];
     }
     if(!prod){unmatched.push({productName,qty});continue;}
 
