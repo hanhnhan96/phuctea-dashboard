@@ -5121,7 +5121,7 @@ applyF();
 fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFilter();initYoYFilters();});
 
 // ===== KIỂM SOÁT NVL =====
-const NVL_RECIPE_KEY='phuctea_nvlrcp_v1';
+const NVL_RECIPE_KEY='phuctea_nvlrcp_v2'; // v2: thêm quyCache & unitChan
 const NVL_SALES_KEY='phuctea_nvlsales_v1';
 // NVL codes to exclude when "Ẩn nước/đá" is checked
 const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
@@ -5173,7 +5173,12 @@ async function nvlUploadRecipe(input){
     if(s1){
       XLSX.utils.sheet_to_json(s1,{header:1,defval:null}).slice(1).forEach(r=>{
         if(!r[0]||!r[1]) return;
-        nvlMap[String(r[0]).trim()]={name:String(r[1]).trim(),unit:r[6]?String(r[6]).trim():''};
+        nvlMap[String(r[0]).trim()]={
+          name:String(r[1]).trim(),
+          unit:r[6]?String(r[6]).trim():'',          // đơn vị tính lẻ (gram, ml, cái…)
+          unitChan:r[5]?String(r[5]).trim():'',       // đơn vị tính chẵn (Kg, Hộp, Gói…)
+          quyCache:parseFloat(r[4])||1,               // 1 đvt chẵn = ? đvt lẻ
+        };
       });
     }
 
@@ -5430,6 +5435,13 @@ function nvlRenderAnalysis(){
   const actual=nvlGetActual(storeCode,entry.sn||'',m,y);
   const rawActual=actual['__raw__']||{};
 
+  // Lookup nhanh: tên NVL (lowercase) → {quyCache, unit, unitChan}
+  // Dùng để quy đổi thực tế (đvt chẵn) → đvt lẻ cho so sánh đúng
+  const nvlInfoByName={};
+  Object.values(recipe.nvlMap||{}).forEach(v=>{
+    nvlInfoByName[v.name.toLowerCase().trim()]=v;
+  });
+
   const rows=Object.entries(theoretical)
     .filter(([,v])=>v.qty>=0.5)
     .sort((a,b)=>b[1].qty-a[1].qty);
@@ -5460,14 +5472,19 @@ function nvlRenderAnalysis(){
 
   let cntRed=0,cntYellow=0,cntOk=0;
   rows.forEach(([nvlCode,{name,unit,qty:thQty}])=>{
-    // Find actual qty by matching name (case-insensitive)
     const actKey=name.toLowerCase().trim();
-    const actQty=actual[actKey]||0;
-    const diff=actQty-thQty;
+    // actQty từ D_ALL = đvt chẵn (Kg, Hộp, Gói…)
+    const actQtyChan=actual[actKey]||0;
+    // Quy đổi sang đvt lẻ để so sánh với lý thuyết
+    const nvlInfo=nvlInfoByName[actKey];
+    const qc=nvlInfo?.quyCache||1;
+    const unitChan=nvlInfo?.unitChan||'';
+    const actQtyLe=actQtyChan*qc;  // đã quy về đvt lẻ
+    const diff=actQtyLe-thQty;
     const pct=thQty>0?(diff/thQty*100):0;
 
     let badge,rowBg='';
-    if(!hasActual||actQty===0){
+    if(!hasActual||actQtyChan===0){
       badge='<span style="background:#edf2f7;color:#718096;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">— Chưa có data HT</span>';
     } else if(pct<-20){
       cntRed++;
@@ -5484,13 +5501,18 @@ function nvlRenderAnalysis(){
       badge='<span style="background:#e8f5ee;color:#1a6b3c;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700">✅ Bình thường</span>';
     }
 
+    // Hiển thị thực tế: đvt lẻ + ghi chú đvt chẵn gốc
+    const actDisplay=actQtyChan>0
+      ?`${actQtyLe.toFixed(1)} <span style="font-size:10px;color:#999;font-weight:400">(${actQtyChan} ${unitChan})</span>`
+      :'–';
+
     html+=`<tr style="${rowBg};border-bottom:1px solid #edf2f7">
       <td style="padding:9px 12px;font-weight:600">${name}</td>
       <td style="padding:9px 12px;text-align:center;color:#718096">${unit}</td>
       <td style="padding:9px 12px;text-align:right;font-weight:700">${thQty.toFixed(1)}</td>
-      <td style="padding:9px 12px;text-align:right;color:#2b6cb0;font-weight:700">${actQty>0?actQty.toFixed(1):'–'}</td>
+      <td style="padding:9px 12px;text-align:right;color:#2b6cb0;font-weight:700">${actDisplay}</td>
       <td style="padding:9px 12px;text-align:right;font-weight:700;color:${diff<-0.1?'#c53030':diff>0.1?'#2b6cb0':'#555'}">
-        ${actQty>0?(diff>=0?'+':'')+diff.toFixed(1):'–'}
+        ${actQtyChan>0?(diff>=0?'+':'')+diff.toFixed(1):'–'}
       </td>
       <td style="padding:9px 12px;text-align:center">${badge}</td>
     </tr>`;
