@@ -5131,6 +5131,8 @@ const NVL_RECIPE_KEY='phuctea_nvlrcp_v2'; // v2: thêm quyCache & unitChan
 const NVL_SALES_KEY='phuctea_nvlsales_v1';
 // NVL codes to exclude when "Ẩn nước/đá" is checked
 const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
+// Chuẩn hoá tên NVL: dùng normalizeSPName để gộp "Trà Hòa Tan Vị Đào Phúc Tea 2026" = "Trà Hòa Tan Vị Đào Phúc Tea", "Ly Nhựa 500ml In 2 Màu" = "Ly Nhựa 500ml", v.v.
+function nvlNormNVLName(name){ return normalizeSPName(name||'').toLowerCase().trim(); }
 
 // Alias: tên base POS (đã lowercase) → tên base trong file công thức
 // Dùng khi POS và file công thức đặt tên khác nhau cho cùng 1 sản phẩm
@@ -5421,7 +5423,7 @@ function nvlGetActual(storeCode,storeName,dateFrom,dateTo){
            (storeName&&cn.includes(storeName.toUpperCase().slice(0,6)));
   }).forEach(r=>{
     const nm=(r.sanPham||'').trim(); if(!nm) return;
-    actual[nm.toLowerCase()]=(actual[nm.toLowerCase()]||0)+(r.sl||0);
+    actual[nvlNormNVLName(nm)]=(actual[nvlNormNVLName(nm)]||0)+(r.sl||0);
     actual['__raw__']=actual['__raw__']||{};
     actual['__raw__'][nm]=(actual['__raw__'][nm]||0)+(r.sl||0);
   });
@@ -5481,7 +5483,7 @@ function nvlRenderAnalysis(){
   // Dùng để quy đổi thực tế (đvt chẵn) → đvt lẻ cho so sánh đúng
   const nvlInfoByName={};
   Object.values(recipe.nvlMap||{}).forEach(v=>{
-    nvlInfoByName[v.name.toLowerCase().trim()]=v;
+    nvlInfoByName[nvlNormNVLName(v.name)]=v;
   });
 
   const rows=Object.entries(theoretical)
@@ -5518,7 +5520,7 @@ function nvlRenderAnalysis(){
 
   let cntRed=0,cntYellow=0,cntOk=0;
   rows.forEach(([nvlCode,{name,unit,qty:thQty}])=>{
-    const actKey=name.toLowerCase().trim();
+    const actKey=nvlNormNVLName(name);
     // actQty từ D_ALL = đvt chẵn (Kg, Hộp, Gói…)
     const actQtyChan=actual[actKey]||0;
     // Quy đổi sang đvt lẻ để so sánh với lý thuyết
