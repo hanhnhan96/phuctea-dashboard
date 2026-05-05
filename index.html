@@ -1025,9 +1025,15 @@ tr:last-child td{border-bottom:none}
     <select id="nvlSelStore" style="border:1px solid #e2e8f0;padding:7px 12px;border-radius:6px;font-size:13px;min-width:200px" onchange="nvlRenderAnalysis()">
       <option value="">-- Chọn cửa hàng --</option>
     </select>
-    <select id="nvlSelMonth" style="border:1px solid #e2e8f0;padding:7px 12px;border-radius:6px;font-size:13px" onchange="nvlRenderAnalysis()">
-      <option value="">-- Chọn tháng --</option>
+    <select id="nvlSelMonth" style="border:1px solid #e2e8f0;padding:7px 12px;border-radius:6px;font-size:13px" onchange="nvlAutoFillDates()">
+      <option value="">-- Tháng bán hàng --</option>
     </select>
+    <div style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:4px 10px">
+      <span style="font-size:11px;color:#718096;white-space:nowrap">📦 Nhập hàng:</span>
+      <input type="date" id="nvlDateFrom" style="border:none;font-size:12px;color:#2d3748;outline:none" onchange="nvlRenderAnalysis()">
+      <span style="color:#aaa">→</span>
+      <input type="date" id="nvlDateTo" style="border:none;font-size:12px;color:#2d3748;outline:none" onchange="nvlRenderAnalysis()">
+    </div>
     <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555;cursor:pointer">
       <input type="checkbox" id="nvlChkPkg" checked onchange="nvlRenderAnalysis()"> Ẩn bao bì
     </label>
@@ -5379,15 +5385,38 @@ function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
   return{result,unmatched};
 }
 
-// Get actual NVL purchases from D_ALL for store+month+year
-function nvlGetActual(storeCode,storeName,month,year){
+// Tự fill ngày nhập hàng theo tháng bán hàng vừa chọn
+function nvlAutoFillDates(){
+  const ym=document.getElementById('nvlSelMonth')?.value||'';
+  if(!ym) return;
+  const[y,m]=[parseInt(ym.split('-')[0]),parseInt(ym.split('-')[1])];
+  const first=`${y}-${String(m).padStart(2,'0')}-01`;
+  const lastDay=new Date(y,m,0).getDate();
+  const last=`${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  const dFrom=document.getElementById('nvlDateFrom');
+  const dTo=document.getElementById('nvlDateTo');
+  if(dFrom&&!dFrom.value) dFrom.value=first;
+  if(dTo&&!dTo.value) dTo.value=last;
+  nvlRenderAnalysis();
+}
+
+// Get actual NVL purchases from D_ALL — lọc theo khoảng ngày tùy chọn
+function nvlGetActual(storeCode,storeName,dateFrom,dateTo){
   const NVL_LOAI=['NL ĐỘC QUYỀN','VL ĐỘC QUYỀN'];
+  const dFrom=dateFrom?new Date(dateFrom):null;
+  const dTo=dateTo?new Date(dateTo):null;
+  if(dTo) dTo.setHours(23,59,59,999);
   const actual={};
   D_ALL.filter(r=>{
-    if(r.thang!=month||r.nam!=year) return false;
     if(!NVL_LOAI.includes(r.loaiHang)) return false;
+    // Lọc theo ngày nếu có
+    if(dFrom||dTo){
+      const rd=r.ngay?new Date(r.ngay):null;
+      if(!rd) return false;
+      if(dFrom&&rd<dFrom) return false;
+      if(dTo&&rd>dTo) return false;
+    }
     const cn=(r.chiNhanh||'').toUpperCase();
-    // Match by PHUCTEAXXX code or store name (first 6 chars)
     return cn.includes(storeCode.toUpperCase())||
            (storeName&&cn.includes(storeName.toUpperCase().slice(0,6)));
   }).forEach(r=>{
@@ -5416,11 +5445,13 @@ function nvlRenderAnalysis(){
 
   const storeCode=document.getElementById('nvlSelStore')?.value||'';
   const ym=document.getElementById('nvlSelMonth')?.value||'';
+  const dateFrom=document.getElementById('nvlDateFrom')?.value||'';
+  const dateTo=document.getElementById('nvlDateTo')?.value||'';
   const excludePkg=document.getElementById('nvlChkPkg')?.checked!==false;
   const excludeWater=document.getElementById('nvlChkWater')?.checked!==false;
 
   if(!storeCode||!ym){
-    res.innerHTML='<div style="text-align:center;padding:40px;color:#aaa">Chọn cửa hàng và tháng để xem phân tích</div>';
+    res.innerHTML='<div style="text-align:center;padding:40px;color:#aaa">Chọn cửa hàng và tháng bán hàng để xem phân tích</div>';
     return;
   }
 
@@ -5431,8 +5462,19 @@ function nvlRenderAnalysis(){
     return;
   }
 
+  // Nếu chưa chọn ngày nhập hàng, tự fill theo tháng bán hàng
+  const dFrom=document.getElementById('nvlDateFrom');
+  const dTo=document.getElementById('nvlDateTo');
+  if(dFrom&&!dFrom.value){
+    dFrom.value=`${y}-${String(m).padStart(2,'0')}-01`;
+  }
+  if(dTo&&!dTo.value){
+    const lastDay=new Date(y,m,0).getDate();
+    dTo.value=`${y}-${String(m).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  }
+
   const{result:theoretical,unmatched}=nvlCalcTheoretical(entry.items,recipe,excludePkg,excludeWater);
-  const actual=nvlGetActual(storeCode,entry.sn||'',m,y);
+  const actual=nvlGetActual(storeCode,entry.sn||'',dFrom?.value||dateFrom,dTo?.value||dateTo);
   const rawActual=actual['__raw__']||{};
 
   // Lookup nhanh: tên NVL (lowercase) → {quyCache, unit, unitChan}
@@ -5450,10 +5492,14 @@ function nvlRenderAnalysis(){
   const matchedCount=entry.items.length-unmatched.length;
   const hasActual=Object.keys(rawActual).length>0;
 
+  const fmtDate=s=>s?s.split('-').reverse().join('/'):'?';
+  const purchasePeriod=(dFrom?.value||dateFrom)?`${fmtDate(dFrom?.value||dateFrom)} → ${fmtDate(dTo?.value||dateTo)}`:`T${m}/${y}`;
+
   // Summary chips
   let html=`<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px">
     <div style="background:#ebf8ff;color:#2b6cb0;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🏪 ${entry.sn||storeCode}</div>
-    <div style="background:#e8f5ee;color:#1a6b3c;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🥤 ${totalItems.toLocaleString('vi-VN')} ly bán</div>
+    <div style="background:#e8f5ee;color:#1a6b3c;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🥤 ${totalItems.toLocaleString('vi-VN')} ly bán T${m}/${y}</div>
+    <div style="background:#f0e6ff;color:#553c9a;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">📦 Nhập hàng: ${purchasePeriod}</div>
     <div style="background:#fff8e6;color:#7a5800;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">📋 ${matchedCount}/${entry.items.length} món có công thức</div>
     <div style="background:#f8fafc;color:#555;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:700">🧪 ${rows.length} NVL theo dõi</div>
     ${!hasActual?'<div style="background:#fff5f5;color:#c53030;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700">⚠️ Không tìm thấy dữ liệu nhập hàng HT cho cửa hàng này</div>':''}
