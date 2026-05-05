@@ -5126,6 +5126,15 @@ const NVL_SALES_KEY='phuctea_nvlsales_v1';
 // NVL codes to exclude when "Ẩn nước/đá" is checked
 const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
 
+// Alias: tên base POS (đã lowercase) → tên base trong file công thức
+// Dùng khi POS và file công thức đặt tên khác nhau cho cùng 1 sản phẩm
+const NVL_PROD_ALIAS={
+  'trà sữa matcha phúc':         'matcha phúc',
+  'trà sữa khoai môn phúc':      'khoai môn phúc',
+  'trà sữa socola phúc':         'socola phúc',
+  'trà sữa khoai môn tươi quết': 'sữa khoai môn tươi quết',
+};
+
 function nvlLoadRecipe(){try{const d=localStorage.getItem(NVL_RECIPE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
 function nvlLoadSales(){try{const d=localStorage.getItem(NVL_SALES_KEY);return d?JSON.parse(d):[];}catch{return[];}}
 
@@ -5335,7 +5344,13 @@ function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
 
   for(const{n:productName,q:qty} of salesItems){
     const key=nvlNormKey(productName);
-    const prod=productMap[key];
+    // Tìm trực tiếp, nếu không có thì thử alias
+    let prod=productMap[key];
+    if(!prod){
+      const[base,size]=key.split('|');
+      const ab=NVL_PROD_ALIAS[base];
+      if(ab) prod=productMap[ab+'|'+size];
+    }
     if(!prod){unmatched.push({productName,qty});continue;}
 
     for(const ing of prod.ings){
