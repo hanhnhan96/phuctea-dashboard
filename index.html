@@ -1733,13 +1733,12 @@ function renderStPivot(){
 
   // Header
   const thead=document.getElementById('stPivotHead');
-  if(thead) thead.innerHTML=`<tr><th style="text-align:left;min-width:180px">Cửa hàng</th>${periods.map(p=>`<th>${periodLabel(p)}</th>`).join('')}<th style="background:#f0f7f3">Tổng</th></tr>`;
+  if(thead) thead.innerHTML=`<tr><th style="text-align:left;min-width:260px">Cửa hàng</th>${periods.map(p=>`<th>${periodLabel(p)}</th>`).join('')}<th style="background:#f0f7f3">Tổng</th></tr>`;
 
   // Body
   let tb='';
   sortedStores.forEach(([s,v])=>{
-    const name=s.replace(/^(PHUCTEA|THEHOA|PHUCTEACENTER)\d+\s*-\s*/i,'');
-    tb+=`<tr><td style="font-weight:600;font-size:11px">${name}</td>${periods.map(p=>`<td>${v[p]?fmtB(v[p]):'–'}</td>`).join('')}<td style="font-weight:700;color:var(--g)">${fmtB(v.total)}</td></tr>`;
+    tb+=`<tr><td style="font-weight:600;font-size:11px">${s}</td>${periods.map(p=>`<td>${v[p]?fmtB(v[p]):'–'}</td>`).join('')}<td style="font-weight:700;color:var(--g)">${fmtB(v.total)}</td></tr>`;
   });
   // Total row
   tb+=`<tr style="background:#f0f7f3;font-weight:700"><td>TỔNG</td>${periods.map(p=>`<td>${fmtB(totalRow[p]||0)}</td>`).join('')}<td>${fmtB(totalRow.total)}</td></tr>`;
