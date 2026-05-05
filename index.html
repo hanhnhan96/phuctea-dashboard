@@ -1715,10 +1715,18 @@ function renderStPivot(){
   function periodKey(r){ if(type==='month')return r.thang; if(type==='quarter')return Math.ceil(r.thang/3); return year; }
   function periodLabel(p){ if(type==='month')return 'T'+p; if(type==='quarter')return 'Q'+p; return String(year); }
 
+  // Gộp cửa hàng theo yêu cầu
+  const ST_MERGE={
+    'PHUCTEA107 - MỸ PHƯỚC 2 BẾN CÁT':  'PHUCTEA059 - MỸ PHƯỚC BẾN CÁT',
+    'PHUCTEA114 - MỸ PHƯỚC 3 BẾN CÁT':  'PHUCTEA059 - MỸ PHƯỚC BẾN CÁT',
+    'PHUCTEA143 - THỚI HÒA BẾN CÁT':    'PHUCTEA059 - MỸ PHƯỚC BẾN CÁT',
+  };
+
   // Aggregate store × period
   const map={};
   rows.forEach(r=>{
-    const s=r.chiNhanh||'–';
+    const raw=r.chiNhanh||'–';
+    const s=ST_MERGE[raw]||raw;
     const pk=periodKey(r);
     if(!periods.includes(pk)) return;
     if(!map[s]) map[s]={total:0};
