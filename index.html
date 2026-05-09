@@ -5127,7 +5127,7 @@ applyF();
 fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFilter();initYoYFilters();});
 
 // ===== KIỂM SOÁT NVL =====
-const NVL_RECIPE_KEY='phuctea_nvlrcp_v2'; // v2: thêm quyCache & unitChan
+const NVL_RECIPE_KEY='phuctea_nvlrcp_v3'; // v3: thêm posMap từ sheet 5
 const NVL_SALES_KEY='phuctea_nvlsales_v1';
 // NVL codes to exclude when "Ẩn nước/đá" is checked
 const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
@@ -5240,10 +5240,23 @@ async function nvlUploadRecipe(input){
       });
     }
 
-    const data={nvlMap,btpMeta,btpRecipes,productMap,loadedAt:new Date().toISOString(),fileName:file.name};
+    // Sheet 5: Danh sách sản phẩm đối chiếu — cột A: mã hàng, cột B: tên POS (tên xuất hiện trên đơn bán hàng)
+    // posMap: normalized(posName) → recipeCode (để khớp POS→recipe mà không cần hardcode alias)
+    const posMap={};
+    const s5=wb.Sheets['5. Danh sách sản phẩm đối chiếu'];
+    if(s5){
+      XLSX.utils.sheet_to_json(s5,{header:1,defval:null}).slice(1).forEach(r=>{
+        if(!r[0]||!r[1]) return;
+        const code=String(r[0]).trim();
+        const posName=String(r[1]).trim();
+        posMap[nvlNormKey(posName)]=code;
+      });
+    }
+
+    const data={nvlMap,btpMeta,btpRecipes,productMap,posMap,loadedAt:new Date().toISOString(),fileName:file.name};
     localStorage.setItem(NVL_RECIPE_KEY,JSON.stringify(data));
-    const nP=Object.keys(productMap).length,nB=Object.keys(btpRecipes).length,nN=Object.keys(nvlMap).length;
-    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm</span><br><span style="color:#888;font-size:11px">${file.name}</span>`;
+    const nP=Object.keys(productMap).length,nB=Object.keys(btpRecipes).length,nN=Object.keys(nvlMap).length,nPOS=Object.keys(posMap).length;
+    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm · ${nPOS} mã POS</span><br><span style="color:#888;font-size:11px">${file.name}</span>`;
   }catch(e){
     el.innerHTML=`<span style="color:#c53030">❌ Lỗi: ${e.message}</span>`;
     console.error('nvlUploadRecipe',e);
@@ -5357,13 +5370,17 @@ function nvlExpandBTP(btpCode,btpQtyNeeded,recipe,excludeWater,depth){
 
 // Compute theoretical NVL consumption from sales items
 function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
-  const{nvlMap,productMap}=recipe;
+  const{nvlMap,productMap,posMap={}}=recipe;
   const result={};  // nvlCode→{name,unit,qty}
   const unmatched=[];
 
   // Bảng tra NVL theo tên chuẩn hoá → code (dùng cho combo bán lẻ)
   const nvlCodeByNorm={};
   Object.entries(nvlMap).forEach(([code,v])=>{ nvlCodeByNorm[nvlNormNVLName(v.name)]=code; });
+
+  // Bảng tra recipe product theo mã hàng (cho posMap lookup)
+  const productByCode={};
+  Object.values(productMap).forEach(p=>{ if(p.code) productByCode[p.code]=p; });
 
   for(const{n:productName,q:qty} of salesItems){
     const key=nvlNormKey(productName);
@@ -5383,8 +5400,15 @@ function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
       continue;
     }
 
-    // Tìm trực tiếp, nếu không có thì thử alias
-    let prod=productMap[key];
+    // 1. Tra posMap (sheet 5): normalized POS name → mã hàng → recipe
+    let prod=null;
+    const rcpCode=posMap[key];
+    if(rcpCode) prod=productByCode[rcpCode];
+
+    // 2. Fallback: khớp trực tiếp theo tên chuẩn hoá (productMap key)
+    if(!prod) prod=productMap[key];
+
+    // 3. Fallback: alias hardcode (NVL_PROD_ALIAS)
     if(!prod){
       const ab=NVL_PROD_ALIAS[base];
       if(ab) prod=productMap[ab+'|'+key.split('|')[1]];
