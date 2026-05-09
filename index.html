@@ -5155,10 +5155,11 @@ const NVL_PROD_ALIAS={
   'trà sữa khoai môn tươi quết': 'sữa khoai môn tươi quết',
 };
 
-// Combo bán lẻ NVL: tên combo POS (lowercase sau normalizeSPName) → { nvlName, qty }
-// Ví dụ: 1 "COMBO SIÊU TIẾT KIỆM (TRÂN CHÂU GIÒN)" = 3 thùng "Trân Châu Giòn Phúc Tea"
+// Combo bán lẻ NVL: key = nvlNormNVLName(tên combo) → { nvlName, qty }
+// normalizeSPName strip ngoặc (), nên key không có ngoặc
+// Ví dụ: "COMBO SIÊU TIẾT KIỆM (TRÂN CHÂU GIÒN)" → norm = "combo siêu tiết kiệm" → 3 thùng NVL
 const NVL_COMBO_MAP={
-  'combo siêu tiết kiệm (trân châu giòn)': { nvlName:'trân châu giòn phúc tea', qty:3 },
+  'combo siêu tiết kiệm': { nvlName:'trân châu giòn phúc tea', qty:3 },
 };
 
 function nvlLoadRecipe(){try{const d=localStorage.getItem(NVL_RECIPE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
@@ -5484,7 +5485,15 @@ function nvlGetActual(storeCode,storeName,dateFrom,dateTo){
            (storeName&&cn.includes(storeName.toUpperCase().slice(0,6)));
   }).forEach(r=>{
     const nm=(r.sanPham||'').trim(); if(!nm) return;
-    actual[nvlNormNVLName(nm)]=(actual[nvlNormNVLName(nm)]||0)+(r.sl||0);
+    const normNm=nvlNormNVLName(nm);
+    const combo=NVL_COMBO_MAP[normNm];
+    if(combo){
+      // Combo nhập hàng → quy đổi ra NVL tương đương (giống lý thuyết)
+      const nvlNorm=nvlNormNVLName(combo.nvlName);
+      actual[nvlNorm]=(actual[nvlNorm]||0)+combo.qty*(r.sl||0);
+    } else {
+      actual[normNm]=(actual[normNm]||0)+(r.sl||0);
+    }
     actual['__raw__']=actual['__raw__']||{};
     actual['__raw__'][nm]=(actual['__raw__'][nm]||0)+(r.sl||0);
   });
@@ -5654,7 +5663,13 @@ function nvlRenderAnalysis(){
   }
 
   // Actual items not in theoretical (extra purchases)
-  const extraActual=Object.entries(rawActual).filter(([nm])=>!rows.some(([,v])=>v.name.toLowerCase()===nm.toLowerCase()));
+  // Dùng nvlNormNVLName để so sánh → "Trà Hòa Tan 2026" khớp "Trà Hòa Tan"
+  // Ẩn combo (đã được expand sang NVL tương đương trong nvlGetActual)
+  const extraActual=Object.entries(rawActual).filter(([nm])=>{
+    const normNm=nvlNormNVLName(nm);
+    if(NVL_COMBO_MAP[normNm]) return false; // combo đã được xử lý
+    return !rows.some(([,v])=>nvlNormNVLName(v.name)===normNm);
+  });
   if(extraActual.length>0){
     html+=`<div style="margin-top:14px;background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:14px">
       <div style="font-weight:700;font-size:13px;color:#2b6cb0;margin-bottom:8px">📦 ${extraActual.length} NVL nhập thêm không có trong công thức</div>
