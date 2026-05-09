@@ -1000,23 +1000,37 @@ tr:last-child td{border-bottom:none}
 
   <!-- Upload row -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+    <!-- Công thức NVL: lưu 1 lần, ẩn nút sau khi đã có dữ liệu -->
     <div style="background:#f8fafc;border:2px dashed #bee3f8;border-radius:12px;padding:18px">
       <div style="font-weight:700;font-size:14px;color:#2b6cb0;margin-bottom:6px">📋 File Công Thức NVL</div>
-      <div style="font-size:11px;color:#718096;margin-bottom:4px">Upload 1 lần — lưu vĩnh viễn</div>
-      <div id="nvlRecipeStatus" style="font-size:12px;color:#888;margin-bottom:12px;min-height:32px">Chưa có dữ liệu</div>
-      <label style="display:inline-block;cursor:pointer;background:#3182ce;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">
+      <div style="font-size:11px;color:#718096;margin-bottom:6px">Lưu 1 lần — giữ nguyên cho đến khi cập nhật</div>
+      <div id="nvlRecipeStatus" style="font-size:12px;color:#888;margin-bottom:10px;min-height:28px">Chưa có dữ liệu</div>
+      <!-- Nút upload chính: hiện khi chưa có dữ liệu -->
+      <label id="nvlRecipeUploadBtn" style="display:inline-block;cursor:pointer;background:#3182ce;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">
         📁 Chọn file Excel
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="nvlUploadRecipe(this)">
       </label>
+      <!-- Link nhỏ "Cập nhật lại": hiện khi đã có dữ liệu -->
+      <div id="nvlRecipeReupload" style="display:none;margin-top:4px">
+        <label style="cursor:pointer;font-size:11px;color:#3182ce;text-decoration:underline">
+          🔄 Cập nhật lại file công thức
+          <input type="file" accept=".xlsx,.xls" style="display:none" onchange="nvlUploadRecipe(this)">
+        </label>
+        &nbsp;|&nbsp;
+        <span onclick="nvlClearRecipe()" style="cursor:pointer;font-size:11px;color:#c53030;text-decoration:underline">🗑 Xóa</span>
+      </div>
     </div>
+    <!-- POS: cập nhật hàng tháng, tích lũy -->
     <div style="background:#f8fafc;border:2px dashed #c6f6d5;border-radius:12px;padding:18px">
       <div style="font-weight:700;font-size:14px;color:#276749;margin-bottom:6px">📊 File Bán Hàng POS (items_report)</div>
-      <div style="font-size:11px;color:#718096;margin-bottom:4px">Upload hàng tháng — tự cập nhật theo tháng</div>
-      <div id="nvlSalesStatus" style="font-size:12px;color:#888;margin-bottom:12px;min-height:32px">Chưa có dữ liệu</div>
+      <div style="font-size:11px;color:#718096;margin-bottom:6px">Cập nhật hàng tháng — tự gộp theo tháng</div>
+      <div id="nvlSalesStatus" style="font-size:12px;color:#888;margin-bottom:10px;min-height:28px">Chưa có dữ liệu</div>
       <label style="display:inline-block;cursor:pointer;background:#38a169;color:#fff;padding:7px 16px;border-radius:7px;font-size:12px;font-weight:700">
-        📁 Chọn file Excel
+        📁 Thêm tháng mới
         <input type="file" accept=".xlsx,.xls" style="display:none" onchange="nvlUploadSales(this)">
       </label>
+      &nbsp;
+      <span onclick="nvlClearSales()" style="cursor:pointer;font-size:11px;color:#c53030;text-decoration:underline;vertical-align:middle">🗑 Xóa tất cả</span>
     </div>
   </div>
 
@@ -5165,6 +5179,31 @@ const NVL_COMBO_MAP={
 function nvlLoadRecipe(){try{const d=localStorage.getItem(NVL_RECIPE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
 function nvlLoadSales(){try{const d=localStorage.getItem(NVL_SALES_KEY);return d?JSON.parse(d):[];}catch{return[];}}
 
+// Toggle UI nút upload công thức: ẩn nút to khi đã có dữ liệu, hiện link nhỏ
+function nvlToggleRecipeUI(hasData){
+  const btn=document.getElementById('nvlRecipeUploadBtn');
+  const re=document.getElementById('nvlRecipeReupload');
+  if(btn) btn.style.display=hasData?'none':'inline-block';
+  if(re)  re.style.display=hasData?'block':'none';
+}
+function nvlClearRecipe(){
+  if(!confirm('Xóa dữ liệu công thức NVL? Bạn sẽ cần upload lại file.')) return;
+  localStorage.removeItem(NVL_RECIPE_KEY);
+  document.getElementById('nvlRecipeStatus').innerHTML='Chưa có dữ liệu';
+  nvlToggleRecipeUI(false);
+  nvlRenderAnalysis();
+}
+function nvlClearSales(){
+  if(!confirm('Xóa toàn bộ dữ liệu bán hàng POS? Hành động này không thể hoàn tác.')) return;
+  localStorage.removeItem(NVL_SALES_KEY);
+  document.getElementById('nvlSalesStatus').innerHTML='Chưa có dữ liệu';
+  const stSel=document.getElementById('nvlSelStore');
+  const mSel=document.getElementById('nvlSelMonth');
+  if(stSel) stSel.innerHTML='<option value="">-- Chọn cửa hàng --</option>';
+  if(mSel)  mSel.innerHTML='<option value="">-- Chọn tháng --</option>';
+  nvlRenderAnalysis();
+}
+
 // Normalize product name → "base_name|SIZE"
 // Handles both recipe format ("Trà Sữa Phúc - Size S") and POS format ("Trà Sữa Phúc (Size S) / 福...")
 function nvlNormKey(name){
@@ -5275,7 +5314,9 @@ async function nvlUploadRecipe(input){
     const data={nvlMap,btpMeta,btpRecipes,productMap,posMap,posNameMap,loadedAt:new Date().toISOString(),fileName:file.name};
     localStorage.setItem(NVL_RECIPE_KEY,JSON.stringify(data));
     const nP=Object.keys(productMap).length,nB=Object.keys(btpRecipes).length,nN=Object.keys(nvlMap).length,nPOS=Object.keys(posMap).length;
-    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm · ${nPOS} mã POS</span><br><span style="color:#888;font-size:11px">${file.name}</span>`;
+    const loadedAt=new Date().toLocaleDateString('vi-VN');
+    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm · ${nPOS} mã POS</span><br><span style="color:#888;font-size:11px">${file.name} · Lưu lúc ${loadedAt}</span>`;
+    nvlToggleRecipeUI(true); // ẩn nút upload to, hiện link nhỏ
   }catch(e){
     el.innerHTML=`<span style="color:#c53030">❌ Lỗi: ${e.message}</span>`;
     console.error('nvlUploadRecipe',e);
@@ -5329,8 +5370,9 @@ async function nvlUploadSales(input){
 
     localStorage.setItem(NVL_SALES_KEY,JSON.stringify(existing));
     nvlUpdateDropdowns();
-    const months=[...new Set(existing.map(d=>`T${d.m}/${d.y}`))].sort().join(', ');
-    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${added} cửa hàng — ${existing.length} bản ghi</span><br><span style="color:#888;font-size:11px">${file.name}</span>`;
+    const allMonths=[...new Set(existing.map(d=>`T${d.m}/${d.y}`))].sort();
+    const allStores=new Set(existing.map(d=>d.st)).size;
+    el.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${allStores} cửa hàng · ${allMonths.length} tháng</span><br><span style="color:#888;font-size:11px">${allMonths.join(', ')}</span>`;
   }catch(e){
     el.innerHTML=`<span style="color:#c53030">❌ Lỗi: ${e.message}</span>`;
     console.error('nvlUploadSales',e);
@@ -5690,17 +5732,29 @@ function nvlRenderAnalysis(){
 function initNVLCtrlTab(){
   const recipe=nvlLoadRecipe();
   const sales=nvlLoadSales();
+
+  // Công thức NVL
   const rEl=document.getElementById('nvlRecipeStatus');
-  if(rEl&&recipe){
+  if(recipe){
     const nP=Object.keys(recipe.productMap||{}).length;
     const nB=Object.keys(recipe.btpRecipes||{}).length;
     const nN=Object.keys(recipe.nvlMap||{}).length;
-    rEl.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm</span><br><span style="color:#888;font-size:11px">${recipe.fileName||''}</span>`;
+    const nPOS=Object.keys(recipe.posMap||{}).length;
+    const savedAt=recipe.loadedAt?new Date(recipe.loadedAt).toLocaleDateString('vi-VN'):'';
+    if(rEl) rEl.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${nN} NVL · ${nB} BTP · ${nP} sản phẩm · ${nPOS} mã POS</span><br><span style="color:#888;font-size:11px">${recipe.fileName||''} · Lưu lúc ${savedAt}</span>`;
+    nvlToggleRecipeUI(true); // ẩn nút to, hiện link nhỏ
+  } else {
+    nvlToggleRecipeUI(false);
   }
+
+  // POS bán hàng
   const sEl=document.getElementById('nvlSalesStatus');
   if(sEl&&sales.length){
-    sEl.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${sales.length} bản ghi cửa hàng × tháng</span>`;
+    const months=[...new Set(sales.map(d=>`T${d.m}/${d.y}`))].sort();
+    const stores=new Set(sales.map(d=>d.st)).size;
+    sEl.innerHTML=`<span style="color:#1a6b3c;font-weight:700">✅ ${stores} cửa hàng · ${months.length} tháng</span><br><span style="color:#888;font-size:11px">${months.join(', ')}</span>`;
   }
+
   nvlUpdateDropdowns();
 }
 </script>
