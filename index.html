@@ -5128,6 +5128,18 @@ fetchSalesFromSheet().then(()=>{fetchKPIFromSheet();fetchCNFromSheet();initCmpFi
 
 // ===== KIỂM SOÁT NVL =====
 const NVL_RECIPE_KEY='phuctea_nvlrcp_v3'; // v3: thêm posMap từ sheet 5
+let _nvlLastUnmatched=[]; // cache để export
+
+function nvlDownloadUnmatched(){
+  if(!_nvlLastUnmatched.length){alert('Không có sản phẩm chưa khớp.');return;}
+  const wb=XLSX.utils.book_new();
+  const rows=[['Mã hàng (Sheet 4, Cột A)','Tên POS (Cột B - điền đúng tên trên đơn bán hàng)','Số lượng bán']];
+  _nvlLastUnmatched.forEach(u=>rows.push(['',u.productName,u.qty]));
+  const ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:28},{wch:55},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws,'5. Danh sách sản phẩm đối chiếu');
+  XLSX.writeFile(wb,`NVL_Sheet5_ChuaKhop_${Date.now()}.xlsx`);
+}
 const NVL_SALES_KEY='phuctea_nvlsales_v1';
 // NVL codes to exclude when "Ẩn nước/đá" is checked
 const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
@@ -5627,13 +5639,17 @@ function nvlRenderAnalysis(){
   }
 
   // Unmatched products
+  _nvlLastUnmatched=unmatched; // lưu cache để export
   if(unmatched.length>0){
     html+=`<div style="margin-top:14px;background:#fffbeb;border:1px solid #f6ad55;border-radius:10px;padding:14px">
-      <div style="font-weight:700;font-size:13px;color:#7a5800;margin-bottom:8px">⚠️ ${unmatched.length} sản phẩm chưa có công thức (không tính vào lý thuyết)</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${unmatched.slice(0,30).map(u=>`<span style="background:#fff;border:1px solid #f6ad55;padding:3px 8px;border-radius:4px;font-size:11px;color:#7a5800">${u.productName} ×${u.qty}</span>`).join('')}
-        ${unmatched.length>30?`<span style="color:#7a5800;font-size:11px;padding:3px 8px">+${unmatched.length-30} món nữa</span>`:''}
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <div style="font-weight:700;font-size:13px;color:#7a5800">⚠️ ${unmatched.length} sản phẩm chưa có công thức (không tính vào lý thuyết)</div>
+        <button onclick="nvlDownloadUnmatched()" style="background:#f6ad55;color:#7a5800;border:none;padding:5px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📥 Tải Sheet 5 mẫu</button>
       </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;max-height:140px;overflow-y:auto;padding-right:4px">
+        ${unmatched.map(u=>`<span style="background:#fff;border:1px solid #f6ad55;padding:3px 8px;border-radius:4px;font-size:11px;color:#7a5800;white-space:nowrap">${u.productName} ×${u.qty}</span>`).join('')}
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:#a16207">💡 Tải file mẫu, điền <b>mã hàng (cột A)</b> tương ứng với từng tên POS, rồi thêm vào sheet "<b>5. Danh sách sản phẩm đối chiếu</b>" và upload lại file công thức.</div>
     </div>`;
   }
 
