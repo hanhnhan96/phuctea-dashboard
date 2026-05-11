@@ -5177,6 +5177,16 @@ const NVL_COMBO_MAP={
   'combo siêu tiết kiệm': { nvlName:'trân châu giòn phúc tea', qty:3 },
 };
 
+// Lọc sản phẩm POS không cần tính NVL:
+//   - Không có size → dòng tổng của các size, đã được đếm ở dòng size cụ thể
+//   - Bắt đầu bằng Đường / Đá → phụ kiện thêm, không phải NVL độc quyền
+function nvlShouldSkipItem(name){
+  const size=nvlNormKey(name).split('|')[1];
+  if(!size) return true;                           // không có size = dòng tổng
+  if(/^(đường|đá)\b/i.test(name.trim())) return true; // Đường / Đá thêm
+  return false;
+}
+
 function nvlLoadRecipe(){try{const d=localStorage.getItem(NVL_RECIPE_KEY);return d?JSON.parse(d):null;}catch{return null;}}
 function nvlLoadSales(){try{const d=localStorage.getItem(NVL_SALES_KEY);return d?JSON.parse(d):[];}catch{return[];}}
 
@@ -5442,6 +5452,9 @@ function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
   Object.entries(nvlMap).forEach(([code,v])=>{ nvlCodeByNorm[nvlNormNVLName(v.name)]=code; });
 
   for(const{c:posCode,n:productName,q:qty} of salesItems){
+    // Bỏ qua: dòng tổng (không có size) và phụ kiện Đường/Đá
+    if(nvlShouldSkipItem(productName)) continue;
+
     const key=nvlNormKey(productName);
     const base=key.split('|')[0];
 
