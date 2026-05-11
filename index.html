@@ -1049,11 +1049,10 @@ tr:last-child td{border-bottom:none}
       <input type="date" id="nvlDateTo" style="border:none;font-size:12px;color:#2d3748;outline:none" onchange="nvlRenderAnalysis()">
     </div>
     <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555;cursor:pointer">
-      <input type="checkbox" id="nvlChkPkg" checked onchange="nvlRenderAnalysis()"> Ẩn bao bì
-    </label>
-    <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:#555;cursor:pointer">
       <input type="checkbox" id="nvlChkWater" checked onchange="nvlRenderAnalysis()"> Ẩn nước/đá
     </label>
+    <!-- nvlChkPkg ẩn — bao bì đã tự bị loại vì không phải NL/VL ĐỘC QUYỀN -->
+    <input type="checkbox" id="nvlChkPkg" checked style="display:none">
   </div>
 
   <!-- Results area -->
@@ -5157,6 +5156,8 @@ function nvlDownloadUnmatched(){
 const NVL_SALES_KEY='phuctea_nvlsales_v1';
 // NVL codes to exclude when "Ẩn nước/đá" is checked
 const NVL_WATER_CODES=new Set(['NVL010138','NVL010139','NVL010144','NVL010145']);
+// Chỉ kiểm soát 2 nhóm này — filter luôn bật, không toggle
+const NVL_DQ_NHOM=new Set(['NL ĐỘC QUYỀN','VL ĐỘC QUYỀN']);
 // Chuẩn hoá tên NVL: dùng normalizeSPName để gộp "Trà Hòa Tan Vị Đào Phúc Tea 2026" = "Trà Hòa Tan Vị Đào Phúc Tea", "Ly Nhựa 500ml In 2 Màu" = "Ly Nhựa 500ml", v.v.
 function nvlNormNVLName(name){ return normalizeSPName(name||'').toLowerCase().trim(); }
 
@@ -5422,6 +5423,7 @@ function nvlExpandBTP(btpCode,btpQtyNeeded,recipe,excludeWater,depth){
       const sub=nvlExpandBTP(nvlCode,(btpQtyNeeded/batchSize)*qPerBatch,recipe,excludeWater,(depth||0)+1);
       Object.entries(sub).forEach(([c,q])=>{result[c]=(result[c]||0)+q;});
     } else {
+      if(!NVL_DQ_NHOM.has(nhom)) continue;        // chỉ NL/VL ĐỘC QUYỀN
       if(excludeWater&&NVL_WATER_CODES.has(nvlCode)) continue;
       result[nvlCode]=(result[nvlCode]||0)+(btpQtyNeeded/batchSize)*qPerBatch;
     }
@@ -5484,8 +5486,8 @@ function nvlCalcTheoretical(salesItems,recipe,excludePkg,excludeWater){
           result[nvlCode].qty+=nvlQty;
         });
       } else {
+        if(!NVL_DQ_NHOM.has(ing.nhom)) continue;  // chỉ NL/VL ĐỘC QUYỀN
         if(excludeWater&&NVL_WATER_CODES.has(ing.code)) continue;
-        if(excludePkg&&(ing.nhom==='Bao bì'||ing.nhom==='Bao Bì')) continue;
         const nvl=nvlMap[ing.code];
         if(!result[ing.code]) result[ing.code]={name:ing.name||(nvl?.name||ing.code),unit:ing.unit||(nvl?.unit||''),qty:0};
         result[ing.code].qty+=ing.qty*qty;
