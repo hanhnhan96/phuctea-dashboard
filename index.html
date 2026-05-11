@@ -5710,19 +5710,22 @@ function nvlRenderAnalysis(){
     </div>`;
   }
 
-  // Actual items not in theoretical (extra purchases)
-  // Dùng nvlNormNVLName để so sánh → "Trà Hòa Tan 2026" khớp "Trà Hòa Tan"
-  // Ẩn combo (đã được expand sang NVL tương đương trong nvlGetActual)
-  const extraActual=Object.entries(rawActual).filter(([nm])=>{
+  // Actual items not in theoretical (extra purchases) — gộp tên thông minh
+  // Group rawActual theo normalized key, hiện tên đã chuẩn hoá (bỏ năm, mùa...)
+  const extraMap={};
+  Object.entries(rawActual).forEach(([nm,qty])=>{
     const normNm=nvlNormNVLName(nm);
-    if(NVL_COMBO_MAP[normNm]) return false; // combo đã được xử lý
-    return !rows.some(([,v])=>nvlNormNVLName(v.name)===normNm);
+    if(NVL_COMBO_MAP[normNm]) return;                           // combo đã expand
+    if(rows.some(([,v])=>nvlNormNVLName(v.name)===normNm)) return; // có trong lý thuyết
+    if(!extraMap[normNm]) extraMap[normNm]={name:normalizeSPName(nm),qty:0};
+    extraMap[normNm].qty+=qty;
   });
+  const extraActual=Object.values(extraMap);
   if(extraActual.length>0){
     html+=`<div style="margin-top:14px;background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:14px">
       <div style="font-weight:700;font-size:13px;color:#2b6cb0;margin-bottom:8px">📦 ${extraActual.length} NVL nhập thêm không có trong công thức</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${extraActual.map(([nm,q])=>`<span style="background:#fff;border:1px solid #bee3f8;padding:3px 8px;border-radius:4px;font-size:11px;color:#2b6cb0">${nm} (${q})</span>`).join('')}
+        ${extraActual.map(({name,qty})=>`<span style="background:#fff;border:1px solid #bee3f8;padding:3px 8px;border-radius:4px;font-size:11px;color:#2b6cb0">${name} (${qty})</span>`).join('')}
       </div>
     </div>`;
   }
