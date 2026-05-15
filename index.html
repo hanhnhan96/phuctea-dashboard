@@ -509,7 +509,7 @@ tr:last-child td{border-bottom:none}
       <div class="fg" style="flex:1;min-width:240px;position:relative">
         <label style="font-size:10px;font-weight:700;color:var(--muted)">Tên sản phẩm</label>
         <input type="text" id="pdProdSearch" placeholder="Nhập tên sản phẩm để tìm..." autocomplete="off"
-          oninput="pdFilterProducts()" onfocus="pdFilterProducts()"
+          oninput="pdFilterProducts()"
           style="width:100%;border:1px solid var(--bdr);border-radius:6px;padding:6px 10px;font-size:12px;outline:none;margin-top:3px">
         <div id="pdProdDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:1px solid #e0e6ed;border-radius:0 0 8px 8px;box-shadow:0 6px 16px rgba(0,0,0,.12);z-index:300;max-height:220px;overflow-y:auto"></div>
       </div>
@@ -1984,22 +1984,22 @@ function renderPdPage(){
 // ===== SẢN LƯỢNG THEO SẢN PHẨM =====
 let _pdSelectedProd='';
 let _pdAllProds=[];
+let _pdDropCache=[]; // cache kết quả dropdown để tránh inline JSON
 
 function pdInitTrend(){
-  // Build danh sách sản phẩm từ D_ALL
+  // Build danh sách sản phẩm unique từ D_ALL — dùng sort đơn giản (không localeCompare)
   const names=new Set();
   (D_ALL||[]).forEach(r=>{if(r.sanPham&&r.sanPham.trim())names.add(r.sanPham.trim());});
-  _pdAllProds=[...names].sort((a,b)=>a.localeCompare(b,'vi'));
+  _pdAllProds=[...names].sort();
 
   // Năm có trong dữ liệu
   const years=[...new Set((D_ALL||[]).map(r=>r.nam).filter(y=>y&&!isNaN(y)))].sort((a,b)=>a-b);
   if(!years.length){years.push(new Date().getFullYear());}
-  const months=[1,2,3,4,5,6,7,8,9,10,11,12];
 
   ['pdFromM','pdToM'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel)return;
-    sel.innerHTML=months.map(m=>`<option value="${m}">Tháng ${m}</option>`).join('');
+    sel.innerHTML=[1,2,3,4,5,6,7,8,9,10,11,12].map(m=>`<option value="${m}">Tháng ${m}</option>`).join('');
   });
   ['pdFromY','pdToY'].forEach(id=>{
     const sel=document.getElementById(id);
@@ -2007,38 +2007,47 @@ function pdInitTrend(){
     sel.innerHTML=years.map(y=>`<option value="${y}">${y}</option>`).join('');
   });
 
-  // Mặc định: từ T1 năm hiện tại → tháng hiện tại
+  // Mặc định: T1 → tháng hiện tại, năm gần nhất trong data
   const curYear=new Date().getFullYear();
   const curMonth=new Date().getMonth()+1;
   const lastY=years.includes(curYear)?curYear:years[years.length-1];
   const fy=document.getElementById('pdFromY');const ty=document.getElementById('pdToY');
   const fm=document.getElementById('pdFromM');const tm=document.getElementById('pdToM');
-  if(fy)fy.value=lastY;
-  if(ty)ty.value=lastY;
-  if(fm)fm.value=1;
-  if(tm)tm.value=curMonth;
+  if(fy)fy.value=lastY;if(ty)ty.value=lastY;
+  if(fm)fm.value=1;if(tm)tm.value=curMonth;
 
-  // Đóng dropdown khi click ra ngoài
+  // Đóng dropdown khi click ra ngoài (chỉ gắn 1 lần)
   document.addEventListener('click',e=>{
     const dd=document.getElementById('pdProdDropdown');
     const inp=document.getElementById('pdProdSearch');
     if(dd&&inp&&!dd.contains(e.target)&&e.target!==inp)dd.style.display='none';
-  },{passive:true});
+  },{passive:true,capture:false});
 }
 
 function pdFilterProducts(){
   const q=(document.getElementById('pdProdSearch').value||'').trim().toLowerCase();
   const dd=document.getElementById('pdProdDropdown');
   if(!dd)return;
-  const pool=_pdAllProds;
-  const matches=q?pool.filter(n=>n.toLowerCase().includes(q)).slice(0,20):pool.slice(0,20);
-  if(!matches.length){dd.style.display='none';return;}
-  dd.innerHTML=matches.map(n=>{
-    const hi=q?n.replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<b style="color:var(--g)">${m}</b>`):n;
-    return `<div onclick="pdSelectProd(${JSON.stringify(n)})"
+  // Lọc + giới hạn 20 kết quả
+  _pdDropCache=q?_pdAllProds.filter(n=>n.toLowerCase().includes(q)).slice(0,20):_pdAllProds.slice(0,20);
+  if(!_pdDropCache.length){dd.style.display='none';return;}
+  // Dùng index thay vì JSON.stringify tên vào onclick (tránh xung đột dấu ngoặc kép)
+  dd.innerHTML=_pdDropCache.map((n,i)=>{
+    // Tô highlight từ khóa tìm kiếm
+    let hi=n;
+    if(q){
+      try{hi=n.replace(new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'gi'),m=>`<b style="color:var(--g)">${m}</b>`);}
+      catch(e){hi=n;}
+    }
+    return `<div data-pidx="${i}"
       style="padding:7px 12px;cursor:pointer;font-size:12px;border-bottom:1px solid #f4f4f4"
-      onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background=''">${hi}</div>`;
+      onmouseover="this.style.background='#f0f7f0'" onmouseout="this.style.background='#fff'">${hi}</div>`;
   }).join('');
+  // Gắn click qua event delegation (1 listener trên container)
+  dd.onclick=e=>{
+    const item=e.target.closest('[data-pidx]');
+    if(item){const idx=parseInt(item.dataset.pidx);if(_pdDropCache[idx])pdSelectProd(_pdDropCache[idx]);}
+  };
   dd.style.display='block';
 }
 
